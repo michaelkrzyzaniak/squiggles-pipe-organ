@@ -1,0 +1,511 @@
+<html>
+  <head>
+    <title>Organ Pipe Maker</title>
+    
+  <!-- so iOS dosent annoyingly zoom in to an input element when selected -->
+  <meta name="viewport" content="user-scalable=no, width=device-width">
+  <meta charset="UTF-8">
+
+  <meta name="theme-color" content="#005493">
+  <meta name="msapplication-navbutton-color" content="#005493">
+  <meta name="apple-mobile-web-app-status-bar-style" content="#005493">
+    
+    <script src="js/three.min.js"></script>
+    <script src="js/OrbitControls.js"></script>
+    <script src="js/STLExporter.js"></script>
+    <script src="js/csg.js"></script>
+    <script src="js/ThreeCSG.js"></script>
+    <script src="js/mouth.js"></script>
+    <script src="js/resonator.js"></script>
+    <script src="js/tone.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/modal_window.css">
+    <style>
+      canvas { width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body onload="init()">
+    <div class="page_header">
+      <div class="info_button" onclick="show_modal('main_modal')">?</div>
+      <div class="info_button" onclick="document.location.href='fittings.html'">f</div>
+      <h1>Organ Pipe Maker</h1>
+    </div>
+    <div class="header_space"></div>
+    <div class="panels_container">
+      <div class="panel">
+        <div class="header">
+          <div class="info_button" onclick="show_modal('settings_modal')">?</div>
+          <div class="info_button" onclick="restore_default_params(true)">&#x27F2;</div>
+          <div class="title">Settings</div>
+        </div>
+        <div class="body">
+          <div class="parameter">
+            <label for="midi_number">Midi Number</label>
+            <input id="midi_number" type="number" value="60" min="0" max="128" step="1.00" onchange="p.midi_number=parseFloat(this.value); init()">
+            <span class="units">MIDI<span>
+          </div>
+          <div class="parameter">
+            <label for="closed">Is Closed</label>
+            <input id="closed" type="checkbox" onchange="p.is_closed=this.checked; init()">
+            <span class="units">Boolean<span>
+          </div>
+          <div class="parameter">
+            <label for="plywood_thickness">Plywood Thickness</label>
+            <input id="plywood_thickness" type="number" value="4.0" min="0" max="128" step="0.01" onchange="p.material_thickness=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="felt_thickness">Felt Thickness</label>
+            <input id="felt_thickness" type="number" value="1.0" min="0" max="128" step="0.01" onchange="p.felt_thickness=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <hr>
+          <div class="parameter">
+            <label for="stem_length">Stem Length</label>
+            <input id="stem_length" type="number" value="20" min="0" max="5000" step="1.00" onchange="p.air_stem_length=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="stem_diameter">Stem Outer Diameter</label>
+            <input id="stem_diameter" type="number" value="20" min="1" max="100" step="1.00" onchange="p.stem_diameter=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="tuning_headroom">Tuning Headroom</label>
+            <input id="tuning_headroom" type="number" value="0.5" min="-10" max="10" step="0.25" onchange="p.tuning_headroom=parseFloat(this.value); init()">
+            <span class="units">semitones<span>
+          </div>
+          <div class="parameter">
+            <label for="kerf">Plywood Kerf</label>
+            <input id="kerf" type="number" value="0.06" min="0" max="5000" step="0.01" onchange="p.kerf=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <hr>
+          <div class="parameter">
+            <label for="normalmensur">Normalmensur</label>
+            <input id="normalmensur" type="number" value="0" min="-20" max="20" step="1.00" onchange="p.normalmensur_deviation=parseFloat(this.value); init()">
+            <span class="units">semitones<span>
+          </div>
+          <div class="parameter">
+            <label for="isings">Ising&apos;s Number</label>
+            <input id="isings" type="number" value="2.0" min="1" max="5" step="0.01" onchange="p.ising_number=parseFloat(this.value); init()">
+            <span class="units">2~3<span>
+          </div>
+
+          <div class="parameter">
+            <label for="pressure">Air Pressure</label>
+            <input id="pressure" type="number" value="50.8" min="0" max="500" step="0.1" onchange="p.air_pressure=parseFloat(this.value); init()">
+            <span class="units">mm H<sub>2</sub>O<span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="header">
+        <div class="info_button" onclick="show_modal('computed_modal')">?</div>
+          <div class="title">Computed</div>
+        </div>
+        <div class="body">
+          <div class="parameter">
+            <label for="cps">Frequency</label>
+            <input id="cps" type="number" readonly>
+            <span class="units">Hz<div class="info_button" onclick="playpause(this)" style="margin-right:0.5em;font-size:0.7em;">&gt;</div><span>
+          </div>
+          <hr>
+          <div class="parameter">
+            <label for="pipe_width">Pipe Width</label>
+            <input id="pipe_width" type="number" readonly>
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="mouth_height">Mouth Height</label>
+            <input id="mouth_height" type="number" readonly>
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="windsheet_width">Windsheet Width</label>
+            <input id="windsheet_width" type="number" readonly>
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="air_flow">Air Flow</label>
+            <input id="air_flow" type="number" readonly>
+            <span class="units">m<sup>3</sup>/s<span>
+          </div>
+          <!--div class="parameter">
+            <label for="air_stem_diameter">Stem Diameter</label>
+            <input id="air_stem_diameter" type="number" readonly>
+            <span class="units">mm<span>
+          </div-->
+          <div class="parameter">
+            <label for="pipe_length">Pipe Length</label>
+            <input id="pipe_length" type="number" readonly>
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="plywood_resonator_length">Plywood Length</label>
+            <input id="plywood_resonator_length" type="number" readonly>
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="tuning_headroom_mm">Tuning Headroom</label>
+            <input id="tuning_headroom_mm" type="number" readonly>
+            <span class="units">mm<span>
+          </div>
+        </div>
+      </div>
+    
+      <br>
+    
+      <div class="panel">
+        <div class="header">
+          <div class="info_button" onclick="show_modal('3d_printed_modal')">?</div>
+          <div class="title">3d Print</div>
+        </div>
+        <div id="canvas_div" style="width:375px; height:300px; border-bottom:1px solid black;"></div>
+        <div class="button_container">
+           <button onclick="save_stl()">Download .stl file (mm units)</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="header">
+          <div class="info_button" onclick="show_modal('laser_cut_modal')">?</div>
+          <div class="title">Laser Cut</div>
+        </div>
+        <div id="svg_div" style="width:375px; height:300px; overflow:auto; border-bottom:1px solid black; background-color:white;s"></div>
+        <div class="button_container">
+          <button type="button" onclick="save_svg()">Download .svg file (mm units)</button>
+        </div>
+      </div>
+
+      <br><br><br><br><br>
+      
+      
+      <div id='settings_modal' class='w3-modal' style='display:none'>
+        <div class='w3-modal-content'>
+          <div class="header">
+            <div class="info_button" onclick='hide_modal("settings_modal")'>&times;</div>
+            <div class="title">Settings Help</div>
+          </div>
+          <div class='w3-container bottom-part'>
+            These parameters are for adjusting the pitch, timbre, material thickness, and other properties of the pipe you want to build. Each setting is discussed in detail here.
+            <hr>
+            <div class="param_name">Midi Number</div>
+            <div class="param_description">The pitch of the pipe, specified as a MIDI note number, where 60 is Middle C (261.6 Hz), and incrementing by one always raises the pitch by one semitone.</div>
+            
+            <div class="param_name">Is Closed</div>
+            <div class="param_description">False indicates the end of the pipe will be open to the environment, true means it will be closed, or stopped. This affects the length of the pipe, and it more subtly affects the width, mouth height, and windsheet thickness.</div>
+            
+            <div class="param_name">Plywood Thickness</div>
+            <div class="param_description">The thickness of the plywood you are going to use for the top part (resonator) or the pipe. This also determines the wall thickness of the 3d printed part.</div>
+
+            <div class="param_name">Felt Thickness</div>
+            <div class="param_description">The thickness of the felt you are going to use to line the inside of the plywood tuning slide.</div>
+    
+            <div class="param_name">Stem Length</div>
+            <div class="param_description">The length of the stem that lets air into the bottom of the pipe. This does not affect the sound of the pipe.</div>
+
+            <div class="param_name">Stem Diameter</div>
+            <div class="param_description">The outer diameter of the stem that lets air into the bottom of the pipe. If you make it really small this web page will adjust it so the inner diameter is 1 mm. Air flow goes with the diameter to the 4th power, so just make it big enough to not restrict air flow</div>
+
+            <hr>
+            <div class="param_name">Tuning Headroom</div>
+            <div class="param_description">The pipe will be shortened by this many half-steps so that it can be tuned down to the correct value by lengthening. Normally a stopped pipe would be tuned up by shortening the pipe, but because of the restrictions of laser-cutting, here we take the approach of making all pipes too short, and tuning them by attaching an open or closed slide to the outside of the pipe. If you need your pipe to be too long so it can be stopped with the traditional method, you can enter a negative number here.</div>
+            
+            <div class="param_name">Kerf</div>
+            <div class="param_description">Width of the kerf of the laser (or router) used to cut the plywood.</div>
+            
+            <hr>
+            
+            <div class="param_name">Normalmensur Deviation</div>
+            <div class="param_description">This makes the pipe wider or narrower than it &apos;should&apos; be. Positive values make the pipe narrower, negative wider. Should range from about -10 to 10, with negative numbers having a more string-like sound, and positive having a more flute-like sound, and values near 0 are for principals. +4 means this pipe will be as wide as a pipe 4 semitones higher should be. This page uses a 17<sup>th</sup> halving ratio. <a href="https://en.wikipedia.org/wiki/Organ_flue_pipe_scaling">more info</a>.</div>
+            
+            <div class="param_name">Ising&apos;s Number</div>
+            <div class="param_description">This number, together with the air pressure, determines the wind-sheet thickenss of the pipe. 2 will give the pipe maximum efficiency and bring out the fundamental tone. Increasing it will bring out the higher harmonics, and above 3 the pipe will be overblown. <a href="http://www.rwgiangiulio.com/math/wst.htm">more info</a>.</div>
+            
+            <div class="param_name">Air Pressure</div>
+            <div class="param_description">The air pressure, above atmospheric pressure, of the pipe's air supply. Used in determining the windsheet thickness. Typical air pressure should be 50 to 75 mm (2 to 3 inches) of water. This refers to the static pressure as measured with a U-tube manometer. (See Ising's Number, above.)</div>
+            
+            <br><br>
+            <button type="button" onclick="hide_modal('settings_modal')">CLOSE</button>
+            
+          </div>
+        </div>
+      </div>
+
+      <div id='computed_modal' class='w3-modal' style='display:none'>
+        <div class='w3-modal-content'>
+          <div class="header">
+            <div class="info_button" onclick='hide_modal("computed_modal")'>&times;</div>
+            <div class="title">Computed Help</div>
+          </div>
+          <div class='w3-container bottom-part'>
+          These values are computed based on the settings you endeted in the Settings panel. Each valus is discussed here.
+            
+           <hr>
+           <div class="param_name">Frequency</div>
+            <div class="param_description">The frequency of the pipe in cycles per second.</div>
+            
+           <div class="param_name">Pipe Width</div>
+            <div class="param_description">The inner width and depth of the pipe. Calculated using <a href="http://www.rwgiangiulio.com/math/pipescaling.htm">this</a>.</div>
+            
+            <div class="param_name">Mouth Height</div>
+            <div class="param_description">The height of the opening at the front of the pipe. This is related to the frequency of the pipe, and whether it is open or closed. <a href="http://www.rwgiangiulio.com/math/mouthheight.htm">More info</a>.</div>
+            
+            <div class="param_name">Windsheet Width</div>
+            <div class="param_description">The width of the thin slit where air exits the pipe. This has to do with the Ising number and the air pressure of the organ's air supply, which you can adjust. Make sure your 3d-printer has a high enough resolution to make this gap accurately. <a href="http://www.rwgiangiulio.com/math/wst.htm">More info</a>.</div>
+
+            <div class="param_name">Air Flow</div>
+            <div class="param_description">The total volume of air that will flow through this pipe in one second, given the supply pressure and the windsheet width. <a href="http://www.rwgiangiulio.com/math/flowrate.htm">More info</a>.</div>
+
+            <div class="param_name">Stem Diameter</div>
+            <div class="param_description">The outer diameter of the air inlet stem at the bottom of the pipe. You can change this in the settings, but if you make it too small the software will adjust it, so the number here will reflect the actual dimension.</div>
+
+            <div class="param_name">Pipe Length</div>
+            <div class="param_description">The total theoretical length of the functional part of the pipe, from where the air exits the mouth of the pipe, to the top of the pipe (for a closed pipe, the top of the <i>inside</i> of the pipe), calculated using <a href="http://www.rwgiangiulio.com/math/pipelength.htm">this</a>. The actual pipe will be somewhat shorter because of the Tuning Headroom, and the tuning slide will bring it to final length.</div>
+            
+            <div class="param_name">Plywood Length</div>
+            <div class="param_description">The length of the plywood resonator part of the pipe. That is the total Pipe Length (as above), minus the functional part of the pipe length that is 3d-printed, minus the tuning headroom. It is the length of the longest pieces of plywood to be cut.</div>
+            
+            <div class="param_name">Tuning Headroom</div>
+            <div class="param_description">The tuning headroom, in millimeters. You can adjust it in semitones in the "Settings" panel. This is approximately how much length you will, in theory, have to add to the pipe to tune it down to the correct pitch.</div>
+            
+            <br><br>
+            <button type="button" onclick="hide_modal('computed_modal')">CLOSE</button>
+            
+          </div>
+        </div>
+      </div>
+
+      <div id='3d_printed_modal' class='w3-modal' style='display:none'>
+        <div class='w3-modal-content'>
+          <div class="header">
+            <div class="info_button" onclick='hide_modal("3d_printed_modal")'>&times;</div>
+            <div class="title">3d-Print Help</div>
+          </div>
+          <div class='w3-container bottom-part'>
+            You need to download the .stl file and prepare it for printing using your 3d printer's software, e.g. Ultimaker Cura or Stratasys Insight. Then you can print it. Here is an image of a finished part:
+            <img src="images/3d_1.jpg" alt="Image of 3d printed part sitting an Ultimaker 3 printer after print completed">
+            Here is bigger one that was printed in a different machine:
+            <img src="images/3d_2.jpg" alt="Image of another 3d printed part on a white background">
+            I'm not sure what the best orientation of the part in the machine is. You will probably need to print support material and then remove it.
+            
+            <br><br>
+            <a href="#" onclick="hide_modal('3d_printed_modal'); show_modal('main_modal')">Go to the whole build tutorial</a>
+            
+            <br><br>
+            <button type="button" onclick="hide_modal('3d_printed_modal')">CLOSE</button>
+          </div>
+        </div>
+      </div>
+      
+      <div id='laser_cut_modal' class='w3-modal' style='display:none'>
+        <div class='w3-modal-content'>
+          <div class="header">
+            <div class="info_button" onclick='hide_modal("laser_cut_modal")'>&times;</div>
+            <div class="title">Laser-Cut Help</div>
+          </div>
+          <div class='w3-container bottom-part'>
+            You are suppoed to download the .svg file and then laser-cut it. The finger-jointed parts should be cut out of plywood and will form the main part of the pipe and the tuning slide (with lid if the pipe is closed). The one plain rectangle in the file should be cut out of felt and will line the inside of the tuning slide, keeping it sealed and providing the right amount of friction for tuning. Here is a photo of the cut plywood:
+            <img src="images/laser_1.jpg" alt="Image of laser-cut plywood sitting an Epilog Zing laser-cutter after cutting finished.">
+            Here is another photo showing all of the parts, including the felt.
+            <img src="images/laser_2.jpg" alt="Image of another 3d printed part on a white background">
+            You might need to re-arragne the parts depending on the size of your pipe and laser cutter. The parts in the .svg file are filled and not stroked, so you will probably have to turn off fill and turn on stroke with the line-width required by your printer and software, e.g. 0px or 'hairline'. I used 100% power, 20% speed, and 500Hz on 3.75mm plywood, and 13% power, 100% speed, and 500Hz for 1mm felt.
+ 
+            <br><br>
+            <a href="#" onclick="hide_modal('laser_cut_modal'); show_modal('main_modal')">Go to the whole build tutorial</a>
+            <br><br>
+            <button type="button" onclick="hide_modal('laser_cut_modal')">CLOSE</button>
+          </div>
+        </div>
+      </div>
+
+      <div id='main_modal' class='w3-modal' style='display:none'>
+        <div class='w3-modal-content'>
+          <div class="header">
+            <div class="info_button" onclick='hide_modal("main_modal")'>&times;</div>
+            <div class="title">What Is This?</div>
+          </div>
+          <div class='w3-container bottom-part'>
+            This page makes organ pipes. You can enter some information about the pitch and timbre of the pipe you want. It creates files that you can download and use to quickly fabricate real organ pipes! The bottom &apos;mouth&apos; part of the pipe will be in a .stl file that can be 3d-printed, and the top &apos;resonator&apos; part of the pipe will be in a .svg file that can be laser-cut out of plywood and felt. The pipes will always be square (just like most real organ pipes), and will have a tuning slide that fits over the top of the pipe for tuning. For stopped pipes, the tuning slide will be closed, for open pipes it is open. Here is a little tutorial on how to build an organ pipe.
+              <hr>
+              Download and 3d-print the mouth part of the pipe. More info is available in the <a href="#" onclick="hide_modal('main_modal'); show_modal('3d_printed_modal')">'3d Print' help</a>.
+              <img src="images/3d_2.jpg" alt="Image of another 3d printed part on a white background">
+              Then download and laser-cut the resonator part of the pipe. More info is available in the <a href="#" onclick="hide_modal('main_modal'); show_modal('laser_cut_modal')">'Laser Cut' help</a>.
+              
+              <img src="images/laser_2.jpg" alt="Image of another 3d printed part on a white background">
+              
+              Use wood-glue to glue the four longest pieces together to form the resonator. After the glue is dry, sand and stain or paint the resonator. This is important, because it helps seal the joints. If the joints are not properly sealed, the pipe might not work well. I used an oil-based wood stain for color, and a water-based polyeurethane to seal everything.
+              
+              <img src="images/pipe.jpg" alt="Four pieces assembled as described in the text">
+              
+              The remaining pieces form the tuning slide. For the best fit, they should be assembled directly onto the resonator. This will involve simultaneously gluing the felt to the inside of the tuning slide using 3M Super 77 Spray Adhesive (or similar), and gluing all of the pieces of the resonator together into a rectangle (with a lid if the pipe is closed) using wood-glue. Clamp the whole assembly firmly to the resonator and allow it to dry, making sure the slide does not accidentally become stuck to the resontor.
+              
+              <img src="images/slide.jpg" alt="Four pieces assembled as described in the text">
+              
+              After the tuning slide is fully assembled and the glue has dried, you can stain / paint it without removing it from the pipe.
+              
+              <br><br>
+              The whole resonator assembly can then be epoxied into the mouth using two-part Gorilla epoxy or similar. It is important that the entire joint be completely air-tight, especially in the front. A finished organ pipe is shown below. It is MIDI number 62 (D above middle C) and is closed at the top.
+              
+              <img src="images/finished.jpg" alt="A finished organ pipe">
+              
+              <br><br>
+              <button type="button" onclick="hide_modal('main_modal')">CLOSE</button>
+              
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <script>
+      var mouth;
+      var resonator;
+      var tone = new Tone();
+      
+      var p = null;
+      try
+        {
+          p = JSON.parse(localStorage.getItem("ORGAN_PIPE_SETTINGS"));
+        }
+      catch
+        {
+        }
+      if(!p)
+        {
+          p = {};
+          restore_default_params(false);
+        }
+      function show(id, val)
+      {
+        if (typeof(val) === 'number')
+          {
+            val = val.toPrecision(3);
+            document.getElementById(id).value = val ;
+          }
+        if (typeof(val) === 'boolean')
+          {
+            document.getElementById(id).checked = val ;
+          }
+        else
+          document.getElementById(id).innerHTML = val ;
+      }
+      
+      function init()
+        {
+          show("canvas_div", "");
+          delete mouth;
+          mouth = new Mouth("canvas_div", p.midi_number, p.material_thickness, p.normalmensur_deviation, p.ising_number, p.is_closed, p.air_pressure, p.air_stem_length, p.stem_diameter, p.tuning_headroom);
+          
+          tone.set_freq(mouth.cps);
+
+          show("midi_number", p.midi_number);
+          show("closed", p.is_closed);
+          show("plywood_thickness", p.material_thickness);
+          show("felt_thickness", p.felt_thickness);
+          show("stem_length", p.air_stem_length);
+          show("stem_diameter", mouth.stem_outer_diameter);
+          show("tuning_headroom", p.tuning_headroom);
+          show("kerf", p.kerf);
+          show("normalmensur", p.normalmensur_deviation);
+          show("isings", p.ising_number);
+          show("pressure", p.air_pressure);
+      
+          show("cps", mouth.cps);
+          show("pipe_width", mouth.pipe_width);
+          show("mouth_height", mouth.mouth_height);
+          show("windsheet_width", mouth.windsheet_width);
+          show("air_flow", mouth.air_flow);
+          //show("air_stem_diameter", mouth.stem_outer_diameter);
+          show("pipe_length", mouth.total_pipe_length);
+          show("plywood_resonator_length", mouth.plywood_resonator_length);
+          show("tuning_headroom_mm", mouth.tuning_headroom_mm);
+          
+          show("svg_div", "");
+          delete resonator;
+          resonator = new Resonator("svg_div", mouth.pipe_width, mouth.plywood_resonator_length, p.nominal_tab_width, p.kerf, p.material_thickness, p.felt_thickness, p.is_closed);
+          
+          localStorage.setItem("ORGAN_PIPE_SETTINGS", JSON.stringify(p));
+        }
+    
+      function get_basename()
+        {
+          return (("0000" + p.midi_number).slice (-3)) + "_" + (p.is_closed ? "closed" : "open") + "_" + p.material_thickness + "mm";
+        }
+    
+      function save_stl()
+        {
+          mouth.download_stl(get_basename());
+        }
+    
+      function save_svg()
+        {
+          resonator.download_svg(get_basename());
+        }
+    
+      function show_modal(id)
+        {
+          document.getElementById(id).style.display='block';
+          document.body.style.overflow='hidden';
+        }
+    
+      function hide_modal(id)
+        {
+          var m = document.getElementById(id);
+          m.scrollTop = 0;
+          m.style.display='none';
+          document.body.style.overflow='auto';
+        }
+
+      function playpause(button)
+        {
+          if(tone.is_playing)
+            {
+              tone.pause();
+              button.innerHTML = "&gt;";
+            }
+          else
+            {
+              tone.play();
+              button.innerHTML = "||";
+            }
+        }
+    
+      function restore_default_params(needs_init)
+      {
+        p.midi_number = 60;
+        p.is_closed = false;
+        p.material_thickness = 4;
+        p.felt_thickness = 1;
+        p.air_stem_length = 20;
+        p.stem_diameter = 20;
+        p.tuning_headroom = 0.5;
+        p.kerf = 0.06;
+        p.normalmensur_deviation = 0;
+        p.ising_number = 2.0;
+        p.air_pressure = 50.8;
+        
+        p.nominal_tab_width = 20;
+        
+        if(needs_init)
+          init();
+      }
+      
+      var url_params = null;
+      (window.onpopstate = function ()
+        {
+          var match,
+          pl     = /\+/g,  // Regex for replacing addition symbol with a space
+          search = /([^&=]+)=?([^&]*)/g,
+          decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+          query  = window.location.search.substring(1);
+
+          url_params = {};
+          while (match = search.exec(query))
+          url_params[decode(match[1])] = decode(match[2]);
+        })();
+
+    </script>
+  </body>
+</html>

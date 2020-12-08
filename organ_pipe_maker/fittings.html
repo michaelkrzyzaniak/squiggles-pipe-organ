@@ -1,0 +1,200 @@
+<html>
+  <head>
+    <title>Organ Pipe Fittings Maker</title>
+    
+  <!-- so iOS dosent annoyingly zoom in to an input element when selected -->
+  <meta name="viewport" content="user-scalable=no, width=device-width">
+  <meta charset="UTF-8">
+
+  <meta name="theme-color" content="#005493">
+  <meta name="msapplication-navbutton-color" content="#005493">
+  <meta name="apple-mobile-web-app-status-bar-style" content="#005493">
+    
+    <script src="js/three.min.js"></script>
+    <script src="js/OrbitControls.js"></script>
+    <script src="js/STLExporter.js"></script>
+    <script src="js/csg.js"></script>
+    <script src="js/ThreeCSG.js"></script>
+    <script src="js/fittings.js"></script>
+    <script src="js/resonator.js"></script>
+    <script src="js/tone.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/modal_window.css">
+    <style>
+      canvas { width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body onload="init()">
+    <div class="page_header">
+      <div class="info_button" onclick="document.location.href='index.html'">o</div>
+      <h1>Fittings Maker</h1>
+    </div>
+    <div class="header_space"></div>
+    <div class="panels_container">
+      <div class="panel">
+        <div class="header">
+          <div class="title">Settings</div>
+        </div>
+        <div class="body">
+          <div class="parameter">
+            <label for="length">Length</label>
+            <input id="length" type="number" value="44" min="0" max="1000" step="1.00" onchange="p.length=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="outer_diameter">Outer Diameter</label>
+            <input id="outer_diameter" type="number" value="50" min="0" max="1000" step="1.00" onchange="p.outer_diameter=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="material_thickness">Material Thickness</label>
+            <input id="material_thickness" type="number" value="3" min="0" max="1000" step="1.00" onchange="p.material_thickness=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="inner_oring_depth">O-Ring Depth</label>
+            <input id="inner_oring_depth" type="number" value="1.5" min="0" max="1000" step="0.25" onchange="p.inner_oring_depth=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+          <div class="parameter">
+            <label for="inner_oring_height">O-Ring Height</label>
+            <input id="inner_oring_height" type="number" value="2.0" min="0" max="1000" step="0.25" onchange="p.inner_oring_height=parseFloat(this.value); init()">
+            <span class="units">mm<span>
+          </div>
+        </div>
+      </div>
+    
+      <br>
+    
+      <div class="panel">
+        <div class="header">
+          <div class="title">3d Print</div>
+        </div>
+        <div id="canvas_div" style="width:375px; height:300px; border-bottom:1px solid black;"></div>
+        <div class="button_container">
+           <button onclick="save_stl()">Download .stl file (mm units)</button>
+        </div>
+      </div>
+
+      <br><br><br><br><br>
+    </div>
+    
+    <script>
+      var fitting;
+      
+      var p = null;
+      try
+        {
+          p = JSON.parse(localStorage.getItem("ORGAN_PIPE_FITTINGS_SETTINGS"));
+        }
+      catch
+        {
+        }
+      if(!p)
+        {
+          p = {};
+          restore_default_params(false);
+        }
+      function show(id, val)
+      {
+        if (typeof(val) === 'number')
+          {
+            val = val.toPrecision(3);
+            document.getElementById(id).value = val ;
+          }
+        if (typeof(val) === 'boolean')
+          {
+            document.getElementById(id).checked = val ;
+          }
+        else
+          document.getElementById(id).innerHTML = val ;
+      }
+      
+      function init()
+        {
+          show("canvas_div", "");
+          delete fitting;
+          fitting = new Fitting("canvas_div", p.length, p.outer_diameter, p.material_thickness, p.inner_oring_depth, p.inner_oring_height);
+
+          show("length", fitting.length);
+          show("outer_diameter", fitting.outer_diameter);
+          show("material_thickness", fitting.material_thickness);
+          show("inner_oring_depth", fitting.inner_oring_depth);
+          show("inner_oring_height", fitting.inner_oring_height);
+          
+          localStorage.setItem("ORGAN_PIPE_FITTINGS_SETTINGS", JSON.stringify(p));
+        }
+    
+      function get_basename()
+        {
+          return "Fitting"
+          //return (("0000" + p.midi_number).slice (-3)) + "_" + (p.is_closed ? "closed" : "open") + "_" + p.material_thickness + "mm";
+        }
+    
+      function save_stl()
+        {
+          fitting.download_stl(get_basename());
+        }
+    
+      function save_svg()
+        {
+          resonator.download_svg(get_basename());
+        }
+    
+      function show_modal(id)
+        {
+          document.getElementById(id).style.display='block';
+          document.body.style.overflow='hidden';
+        }
+    
+      function hide_modal(id)
+        {
+          var m = document.getElementById(id);
+          m.scrollTop = 0;
+          m.style.display='none';
+          document.body.style.overflow='auto';
+        }
+
+      function playpause(button)
+        {
+          if(tone.is_playing)
+            {
+              tone.pause();
+              button.innerHTML = "&gt;";
+            }
+          else
+            {
+              tone.play();
+              button.innerHTML = "||";
+            }
+        }
+    
+      function restore_default_params(needs_init)
+      {
+        p.length = 44
+        p.outer_diameter = 50;
+        p.material_thickness = 3;
+        p.inner_oring_height = 1.5;
+        p.inner_oring_height = 2;
+        
+        if(needs_init)
+          init();
+      }
+      
+      var url_params = null;
+      (window.onpopstate = function ()
+        {
+          var match,
+          pl     = /\+/g,  // Regex for replacing addition symbol with a space
+          search = /([^&=]+)=?([^&]*)/g,
+          decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+          query  = window.location.search.substring(1);
+
+          url_params = {};
+          while (match = search.exec(query))
+          url_params[decode(match[1])] = decode(match[2]);
+        })();
+
+    </script>
+  </body>
+</html>
