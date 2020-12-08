@@ -1,0 +1,13 @@
+#! /bin/bash
+
+source venv/bin/activate
+
+python train.py \
+     --data_root=data \
+     --sessions_root=sessions \
+     --data_folder=bach_multiinstrumental \
+     --session_folder=bach_2048_hop_1024_64 \
+     --num_batches=10000 \
+     --save_every=1000 \
+     --use_cpu=True
+deactivate

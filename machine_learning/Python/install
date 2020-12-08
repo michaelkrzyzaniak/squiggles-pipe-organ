@@ -1,0 +1,8 @@
+mkdir venv
+virtualenv -p python3 --system-site-packages venv
+source venv/bin/activate
+pip3 install torch
+pip3 install pysoundfile
+pip3 install librosa
+pip3 install mido
+deactivate
