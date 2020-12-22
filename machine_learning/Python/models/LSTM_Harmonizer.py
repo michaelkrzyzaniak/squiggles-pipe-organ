@@ -24,9 +24,11 @@ class LSTM_Harmonizer(nn.Module) :
         self.input_size = 2048
         self.hop_size = self.input_size // 2
         self.hidden_size = 64#265
-        self.output_size = self.highest_midi_note - self.lowest_midi_note + 1;
+        self.output_size = self.highest_midi_note - self.lowest_midi_note + 1
         
-        self.lstm = nn.LSTM(3, 3)
+        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=1, dropout=0.2)
+        self.fc_out = nn.Linear(self.hidden_size, self.output_size)
+        self.fc_out_activation = torch.nn.Sigmoid()
         
         #self.layer_1      = torch.nn.Linear(self.input_size + self.output_size, self.hidden_size);
         #self.activation_1 = torch.nn.ReLU()
@@ -232,14 +234,19 @@ class LSTM_Harmonizer(nn.Module) :
             return str(m) + ":" + str(s).zfill(2)
     
     #-------------------------------------------------------------------------------------------
-    def forward(self, x) :
-        hidden   = self.activation_1(self.layer_1(x))
-        #hidden_2 = self.activation_1_5(self.layer_1_5(hidden))
-        output   = self.activation_2(self.layer_2(hidden))
-        return output
+    def forward(self, x, prev_state) :
+        hidden, state = self.lstm(x, prev_state)
+        output = self.fc_out_activation(self.fc(hidden))
+        return output, state;
 
     #-------------------------------------------------------------------------------------------
-    def do_forward_batch_and_get_loss(self, examples_per_batch, is_training):
+    def get_initial_state(self, sequence_length) :
+        #(cell state vector, hidden (output) state vector)
+        return (torch.zeros(1, sequence_length, self.input_size),
+                torch.zeros(1, sequence_length, self.hiddens_size))
+
+    #-------------------------------------------------------------------------------------------
+    def do_forward_batch_and_get_loss(self, examples_per_batch, state, is_training):
         if is_training is True:
             self.train()
         else:
@@ -247,7 +254,7 @@ class LSTM_Harmonizer(nn.Module) :
         
         #loss_function = torch.nn.MSELoss()
         loss_function = torch.nn.BCELoss()
-        input, target_output = self.get_random_training_batch(examples_per_batch, is_training)
+        input, target_output = self.get_sequential_training_batch(examples_per_batch, is_training)
         input = torch.FloatTensor(input)
         target_output = torch.FloatTensor(target_output)
         
@@ -255,28 +262,31 @@ class LSTM_Harmonizer(nn.Module) :
             input  = input.cuda()
             target_output = target_output.cuda()
 
-        output = self(input)
-        return loss_function(output, target_output)
+        output, state = self(input, state)
+        return loss_function(output, target_output), state
     
     #-------------------------------------------------------------------------------------------
-    def train_model(self, num_batches, examples_per_batch, save_every, lr) :
+    #https://www.kdnuggets.com/2020/07/pytorch-lstm-text-generation-tutorial.html
+    def train_model(self, num_batches, sequence_length, save_every, lr) :
         optimizer = optim.Adam(self.parameters())
         #optimizer = optim.SGD(self.parameters(), lr, momentum=0.9)
         for p in optimizer.param_groups : p['lr'] = lr
         start = time.time()
         
+        #todo: how often to init state? Tutorial has once per epoch...
+        state = model.init_state(sequence_length)
+        
         for batch in range(self.get_saved_num_batches(), num_batches) :
             optimizer.zero_grad()
-            loss = self.do_forward_batch_and_get_loss(examples_per_batch, True)
+            loss, state = self.do_forward_batch_and_get_loss(examples_per_batch, state, True)
             loss.backward()
             #torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
             optimizer.step()
             
-            validation_loss = 0#self.validate(examples_per_batch)
             elapsed = self.time_since(start)
             speed = (time.time() - start) / (batch + 1)
 
-            print("Batch {0} of {1} --- Training Loss: {2} --- Validation Loss: {3} --- Elapsed Time: {4} --- Sec / Batch: {5}".format(batch + 1, num_batches, loss.item(), validation_loss, elapsed, speed))
+            print("Batch {0} of {1} --- Training Loss: {2} --- Elapsed Time: {4} --- Sec / Batch: {5}".format(batch + 1, num_batches, loss.item(), elapsed, speed))
             if (((batch+1) % save_every) == 0) or (batch is num_batches-1):
                 self.save_checkpoint(batch+1)
                 self.reverse_synthesize_gold_standard("Josquin")
