@@ -286,25 +286,25 @@ class LSTM_Harmonizer(nn.Module) :
     #-------------------------------------------------------------------------------------------
     def forward(self, x, prev_state) :
         hidden, state = self.lstm(x, prev_state)
-        output = self.fc_out_activation(self.fc(hidden))
+        output = self.fc_out_activation(self.fc_out(hidden))
         return output, state;
 
     #-------------------------------------------------------------------------------------------
     def get_initial_state(self) :
         #(cell state vector, hidden (output) state vector)
         # first argurment is num_layers
-        return (torch.zeros(1, self.sequence_length, self.input_size),
+        return (torch.zeros(1, self.sequence_length, self.hidden_size),
                 torch.zeros(1, self.sequence_length, self.hidden_size))
 
     #-------------------------------------------------------------------------------------------
-    def do_forward_batch_and_get_loss(self, examples_per_batch, state, is_training):
+    def do_forward_batch_and_get_loss(self, loss_function, examples_per_batch, state, is_training):
         if is_training is True:
             self.train()
         else:
             self.eval()
         
         #loss_function = torch.nn.MSELoss()
-        loss_function = torch.nn.BCELoss()
+        #loss_function = torch.nn.BCELoss()
         input, target_output = self.get_random_training_batch(examples_per_batch, is_training)
         input = torch.FloatTensor(input)
         target_output = torch.FloatTensor(target_output)
@@ -326,10 +326,11 @@ class LSTM_Harmonizer(nn.Module) :
         
         #todo: how often to init state? Tutorial has once per epoch...
         state = self.get_initial_state()
+        loss_function = torch.nn.BCELoss()
         
         for batch in range(self.get_saved_num_batches(), num_batches) :
             optimizer.zero_grad()
-            loss, state = self.do_forward_batch_and_get_loss(examples_per_batch, state, True)
+            loss, state = self.do_forward_batch_and_get_loss(loss_function, examples_per_batch, state, True)
             loss.backward()
             #torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
             optimizer.step()
@@ -337,7 +338,7 @@ class LSTM_Harmonizer(nn.Module) :
             elapsed = self.time_since(start)
             speed = (time.time() - start) / (batch + 1)
 
-            print("Batch {0} of {1} --- Training Loss: {2} --- Elapsed Time: {4} --- Sec / Batch: {5}".format(batch + 1, num_batches, loss.item(), elapsed, speed))
+            print("Batch {0} of {1} --- Training Loss: {2} --- Elapsed Time: {3} --- Sec / Batch: {4}".format(batch + 1, num_batches, loss.item(), elapsed, speed))
             if (((batch+1) % save_every) == 0) or (batch is num_batches-1):
                 self.save_checkpoint(batch+1)
                 self.reverse_synthesize_gold_standard("Josquin")
