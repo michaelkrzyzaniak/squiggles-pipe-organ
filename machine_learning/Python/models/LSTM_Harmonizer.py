@@ -21,7 +21,9 @@ class LSTM_Harmonizer(nn.Module) :
         self.lowest_midi_note = 36
         self.highest_midi_note = 96
         
-        self.input_size = 2048
+        self.sequence_length = 64
+        
+        self.input_size = 1024
         self.hop_size = self.input_size // 2
         self.hidden_size = 64#265
         self.output_size = self.highest_midi_note - self.lowest_midi_note + 1
@@ -105,8 +107,6 @@ class LSTM_Harmonizer(nn.Module) :
         conjuga = np.conjugate(spectra)
         spectra = np.multiply(spectra, conjuga)
         
-        
-        
         #spectra = np.real(spectra)
         #compute autocorrelation
         spectra = np.fft.irfft(spectra, 2*n)
@@ -171,6 +171,55 @@ class LSTM_Harmonizer(nn.Module) :
         return vector
 
     #-------------------------------------------------------------------------------------------
+    def get_random_training_filename_pair():
+        audio_directory = os.path.join(self.data_directory, training_folder, "Audio")
+        midi_directory  = os.path.join(self.data_directory, training_folder, "MIDI")
+        
+        input_voice_mask = random.randint(1, 14)
+        free_voices = [];
+        for i in range(4):
+            if (input_voice_mask & (1 << i)) == 0:
+                free_voices.append(i)
+        output_voice_mask = 1 << (free_voices[random.randint(0, len(free_voices)-1)]);
+
+        wavs = glob.glob(audio_directory + "/*_{}.wav".format(input_voice_mask));
+        wav =  wavs[random.randint(0, len(wavs)-1)];
+    
+        mid = os.path.basename(wav)
+        mid = mid.replace("_{}.wav".format(input_voice_mask), "_{}.mid".format(output_voice_mask))
+        mid = os.path.join(midi_directory, mid)
+        return wav, mid
+        
+    #-------------------------------------------------------------------------------------------
+    def get_random_training_sequence_from_file(self, wav_filename, midi_filename):
+        wav, sr = librosa.load(wav_filename, sr=self.sample_rate, mono=True)
+        sequence_length_in_samples = (self.sequence_length*self.hop_size-1) + self.input_size
+        wav_length_in_samples = len(wav)
+        if wav_length_in_samples < (wav_length_in_samples):
+            print("{} could not be loaded because it is too short.".format(audio_filename))
+            return None, None
+        
+        audio = [];
+        start_sample = np.random.randint(0, wav_length_in_samples-sequence_length_in_samples-1)
+        for i in range(self.sequence_length):
+            s = start_sample + (i*self.hop_size)
+            audio.append(wav[s : s+self.input_size])
+            audio[i] = self.calculate_audio_features(audio[i])
+
+        output_array = []
+        midi_file = MidiFile(midi_filename)
+        start_secs = start_sample / sr
+        end_secs = (start_sample + self.input_size) / sr
+        hop_secs = self.hop_size / sr
+        for i in range(self.sequence_length):
+            notes = self.get_active_MIDI_notes_in_time_range(midi_file, start_secs, end_secs)
+            output_array.append(self.output_notes_to_vector(notes))
+            start_secs += hop_secs
+            end_secs += hop_secs
+        
+        return audio, output_array
+        
+    #-------------------------------------------------------------------------------------------
     def get_random_training_example_from_file(self, audio_basename, is_training=True):
         training_folder = "Training" if is_training else "Validation"
         audio_path = os.path.join(self.data_directory, training_folder, "Audio", audio_basename)
@@ -203,13 +252,13 @@ class LSTM_Harmonizer(nn.Module) :
     def get_random_training_batch(self, examples_per_batch, is_training=True):
         input_data = [];
         output_data = [];
-        training_folder = "Training" if is_training else "Validation"
-        wav_paths = glob.glob(os.path.join(self.data_directory, training_folder, "Audio/*.wav"))
+        #training_folder = "Training" if is_training else "Validation"
+        #wav_paths = glob.glob(os.path.join(self.data_directory, "Training", "Audio/*.wav"))
         
         for i in range(examples_per_batch):
-            wav_index = np.random.randint(0, len(wav_paths))
-            basename = os.path.basename(wav_paths[wav_index])
-            x, y = self.get_random_training_example_from_file(basename, is_training)
+            get_random_training_sequence_from_file()
+            self.get_random_training_filename_pair()
+            x, y = self.get_random_training_sequence_from_file(basename)
             input_data.append(x)
             output_data.append(y)
 
@@ -254,7 +303,7 @@ class LSTM_Harmonizer(nn.Module) :
         
         #loss_function = torch.nn.MSELoss()
         loss_function = torch.nn.BCELoss()
-        input, target_output = self.get_sequential_training_batch(examples_per_batch, is_training)
+        input, target_output = self.get_random_training_batch(examples_per_batch, is_training)
         input = torch.FloatTensor(input)
         target_output = torch.FloatTensor(target_output)
         
