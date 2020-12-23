@@ -2,6 +2,7 @@ import argparse
 import time, sys, math
 import os.path
 from models.Multiple_F0 import Multiple_F0
+from models.LSTM_Harmonizer import LSTM_Harmonizer
 
 default_sessions_root     = "sessions"
 default_data_root         = "data"
@@ -33,24 +34,27 @@ if not os.path.exists(args.sessions_root):
 if not os.path.exists(session_directory):
     os.makedirs(session_directory)
 
-f0 = Multiple_F0(session_directory, data_directory, args.use_cpu != "False")
-f0.restore_if_checkpoint_exists(session_directory)
+#f0 = Multiple_F0(session_directory, data_directory, args.use_cpu != "False")
+#f0.restore_if_checkpoint_exists(session_directory)
+
+lstm = LSTM_Harmonizer(session_directory, data_directory, args.use_cpu != "False")
+lstm.restore_if_checkpoint_exists(session_directory)
 
 if args.use_cpu == "False" :
-  f0 = f0.cuda();
+  lstm = lstm.cuda();
 else:
-  f0 = f0.cpu();
+  lstm = lstm.cpu();
 
 
 if args.gold_standard != "":
     #f0.reverse_synthesize_gold_standard(args.gold_standard)
-    f0.sample()
+    lstm.sample()
     exit()
 
 if not os.path.exists(data_directory):
     print ("No such data directory " + data_directory)
     exit();
 
-f0.train_model(args.num_batches, examples_per_batch, args.save_every, args.learning_rate)
+lstm.train_model(args.num_batches, examples_per_batch, args.save_every, args.learning_rate)
 #f0.reverse_synthesize_gold_standard(160)
 

@@ -8,6 +8,7 @@ import glob
 import os.path
 import mido
 import time
+import random
 from mido import MidiFile
 from mido import MidiTrack
 from mido import Message
@@ -28,7 +29,7 @@ class LSTM_Harmonizer(nn.Module) :
         self.hidden_size = 64#265
         self.output_size = self.highest_midi_note - self.lowest_midi_note + 1
         
-        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=1, dropout=0.2)
+        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=1)
         self.fc_out = nn.Linear(self.hidden_size, self.output_size)
         self.fc_out_activation = torch.nn.Sigmoid()
         
@@ -171,7 +172,8 @@ class LSTM_Harmonizer(nn.Module) :
         return vector
 
     #-------------------------------------------------------------------------------------------
-    def get_random_training_filename_pair():
+    def get_random_training_filename_pair(self, is_training=True):
+        training_folder = "Training" if is_training else "Validation"
         audio_directory = os.path.join(self.data_directory, training_folder, "Audio")
         midi_directory  = os.path.join(self.data_directory, training_folder, "MIDI")
         
@@ -256,9 +258,8 @@ class LSTM_Harmonizer(nn.Module) :
         #wav_paths = glob.glob(os.path.join(self.data_directory, "Training", "Audio/*.wav"))
         
         for i in range(examples_per_batch):
-            get_random_training_sequence_from_file()
-            self.get_random_training_filename_pair()
-            x, y = self.get_random_training_sequence_from_file(basename)
+            wav, mid = self.get_random_training_filename_pair()
+            x, y = self.get_random_training_sequence_from_file(wav, mid)
             input_data.append(x)
             output_data.append(y)
 
@@ -289,10 +290,11 @@ class LSTM_Harmonizer(nn.Module) :
         return output, state;
 
     #-------------------------------------------------------------------------------------------
-    def get_initial_state(self, sequence_length) :
+    def get_initial_state(self) :
         #(cell state vector, hidden (output) state vector)
-        return (torch.zeros(1, sequence_length, self.input_size),
-                torch.zeros(1, sequence_length, self.hiddens_size))
+        # first argurment is num_layers
+        return (torch.zeros(1, self.sequence_length, self.input_size),
+                torch.zeros(1, self.sequence_length, self.hidden_size))
 
     #-------------------------------------------------------------------------------------------
     def do_forward_batch_and_get_loss(self, examples_per_batch, state, is_training):
@@ -316,14 +318,14 @@ class LSTM_Harmonizer(nn.Module) :
     
     #-------------------------------------------------------------------------------------------
     #https://www.kdnuggets.com/2020/07/pytorch-lstm-text-generation-tutorial.html
-    def train_model(self, num_batches, sequence_length, save_every, lr) :
+    def train_model(self, examples_per_batch, num_batches, save_every, lr) :
         optimizer = optim.Adam(self.parameters())
         #optimizer = optim.SGD(self.parameters(), lr, momentum=0.9)
         for p in optimizer.param_groups : p['lr'] = lr
         start = time.time()
         
         #todo: how often to init state? Tutorial has once per epoch...
-        state = model.init_state(sequence_length)
+        state = self.get_initial_state()
         
         for batch in range(self.get_saved_num_batches(), num_batches) :
             optimizer.zero_grad()
@@ -378,11 +380,13 @@ class LSTM_Harmonizer(nn.Module) :
         off_for = 4.0
         on_count = np.zeros(self.output_size)
         
+        state = self.get_initial_state()
+        
         while (start_sample + self.input_size) < len(wav):
             input = wav[start_sample : start_sample + self.input_size]
             input = self.calculate_audio_features(input)
-            prev_output_vector = self.output_notes_to_vector(prev_notes)
-            input = np.concatenate((input, prev_output_vector))
+            #prev_output_vector = self.output_notes_to_vector(prev_notes)
+            #input = np.concatenate((input, prev_output_vector))
             #input = np.concatenate((input, output.detach().numpy()))
             
             #input = np.multiply(input, 1.0-smoothing_coefficient);
@@ -392,7 +396,7 @@ class LSTM_Harmonizer(nn.Module) :
             current_notes = []
             
             input = torch.FloatTensor(input)
-            output = self(input)
+            output, state = self(input, state)
             for i in range(len(output)) :
                 if np.random.sample() < output[i] :
                     on_count[i] += 1.0 / on_for
