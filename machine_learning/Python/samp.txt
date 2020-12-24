@@ -4,9 +4,9 @@ source venv/bin/activate
 
 python train.py \
      --data_root=data \
-     --sessions_root=sessions \
+     --sessions_root=lstm_sessions \
      --data_folder=bach_multiinstrumental \
-     --session_folder=bach_2048_hop_1024  \
+     --session_folder=lstm_test_1  \
      --use_cpu=True \
      --gold_standard="Fugue"
 deactivate

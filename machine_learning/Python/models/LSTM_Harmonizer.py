@@ -29,7 +29,7 @@ class LSTM_Harmonizer(nn.Module) :
         self.hidden_size = 64#265
         self.output_size = self.highest_midi_note - self.lowest_midi_note + 1
         
-        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=1)
+        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
         self.fc_out = nn.Linear(self.hidden_size, self.output_size)
         self.fc_out_activation = torch.nn.Sigmoid()
         
@@ -290,11 +290,11 @@ class LSTM_Harmonizer(nn.Module) :
         return output, state;
 
     #-------------------------------------------------------------------------------------------
-    def get_initial_state(self) :
+    def get_initial_state(self, examples_per_batch) :
         #(cell state vector, hidden (output) state vector)
         # first argurment is num_layers
-        return (torch.zeros(1, self.sequence_length, self.hidden_size),
-                torch.zeros(1, self.sequence_length, self.hidden_size))
+        return (torch.zeros(1, examples_per_batch, self.hidden_size),
+                torch.zeros(1, examples_per_batch, self.hidden_size))
 
     #-------------------------------------------------------------------------------------------
     def do_forward_batch_and_get_loss(self, loss_function, examples_per_batch, state, is_training):
@@ -307,6 +307,7 @@ class LSTM_Harmonizer(nn.Module) :
         #loss_function = torch.nn.BCELoss()
         input, target_output = self.get_random_training_batch(examples_per_batch, is_training)
         input = torch.FloatTensor(input)
+        
         target_output = torch.FloatTensor(target_output)
         
         if self.use_cpu == False:
@@ -318,18 +319,19 @@ class LSTM_Harmonizer(nn.Module) :
     
     #-------------------------------------------------------------------------------------------
     #https://www.kdnuggets.com/2020/07/pytorch-lstm-text-generation-tutorial.html
-    def train_model(self, examples_per_batch, num_batches, save_every, lr) :
+    def train_model(self, num_batches, examples_per_batch, save_every, lr) :
         optimizer = optim.Adam(self.parameters())
         #optimizer = optim.SGD(self.parameters(), lr, momentum=0.9)
         for p in optimizer.param_groups : p['lr'] = lr
         start = time.time()
         
         #todo: how often to init state? Tutorial has once per epoch...
-        state = self.get_initial_state()
         loss_function = torch.nn.BCELoss()
         
         for batch in range(self.get_saved_num_batches(), num_batches) :
             optimizer.zero_grad()
+            state = self.get_initial_state(examples_per_batch)
+            
             loss, state = self.do_forward_batch_and_get_loss(loss_function, examples_per_batch, state, True)
             loss.backward()
             #torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
@@ -381,11 +383,14 @@ class LSTM_Harmonizer(nn.Module) :
         off_for = 4.0
         on_count = np.zeros(self.output_size)
         
-        state = self.get_initial_state()
+        self.eval();
         
+        state = self.get_initial_state(1)
         while (start_sample + self.input_size) < len(wav):
+        
             input = wav[start_sample : start_sample + self.input_size]
-            input = self.calculate_audio_features(input)
+            
+            input = [[self.calculate_audio_features(input)]]
             #prev_output_vector = self.output_notes_to_vector(prev_notes)
             #input = np.concatenate((input, prev_output_vector))
             #input = np.concatenate((input, output.detach().numpy()))
@@ -397,7 +402,11 @@ class LSTM_Harmonizer(nn.Module) :
             current_notes = []
             
             input = torch.FloatTensor(input)
-            output, state = self(input, state)
+            output, state = self.forward(input, state)
+            output = output[0][0]; #remove superfluous dimensions
+            
+            
+            
             for i in range(len(output)) :
                 if np.random.sample() < output[i] :
                     on_count[i] += 1.0 / on_for
