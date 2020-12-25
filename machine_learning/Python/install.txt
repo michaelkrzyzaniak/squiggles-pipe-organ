@@ -1,13 +1,6 @@
 mkdir venv
-
-#python3 -m venv venv
-
 virtualenv --python=python3.6 venv
 source venv/bin/activate
-
-echo here
-which pip3
-
 pip3 install --upgrade pip
 pip3 install -U pip setuptools
 pip3 install --upgrade torch
