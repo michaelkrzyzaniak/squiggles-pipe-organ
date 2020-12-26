@@ -26,14 +26,15 @@ class LSTM_Harmonizer(nn.Module) :
         
         self.input_size = 1024
         self.hop_size = self.input_size // 2
-        self.hidden_size = 64#265
         self.output_size = self.highest_midi_note - self.lowest_midi_note + 1
+        self.hidden_size = self.output_size#265
+        self.num_lstm_layers = 1
         
         #supposedly runs faster with batch_first = false
         # use torch.transpose(tensor_name, 0, 1)
-        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
-        self.fc_out = nn.Linear(self.hidden_size, self.output_size)
-        self.fc_out_activation = torch.nn.Sigmoid()
+        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=self.num_lstm_layers, batch_first=True)
+        #self.fc_out = nn.Linear(self.hidden_size, self.output_size)
+        #self.fc_out_activation = torch.nn.Sigmoid()
         
         #self.layer_1      = torch.nn.Linear(self.input_size + self.output_size, self.hidden_size);
         #self.activation_1 = torch.nn.ReLU()
@@ -288,18 +289,15 @@ class LSTM_Harmonizer(nn.Module) :
     #-------------------------------------------------------------------------------------------
     def forward(self, x, prev_state) :
         hidden, state = self.lstm(x, prev_state)
-        
-        print(hidden.shape)
-        
-        output = self.fc_out_activation(self.fc_out(hidden))
+        #output = self.fc_out_activation(self.fc_out(hidden))
         return output, state;
 
     #-------------------------------------------------------------------------------------------
     def get_initial_state(self, examples_per_batch) :
         #(cell state vector, hidden (output) state vector)
         # first argurment is num_layers
-        return (torch.zeros(1, examples_per_batch, self.hidden_size),
-                torch.zeros(1, examples_per_batch, self.hidden_size))
+        return (torch.zeros(self.num_lstm_layers, examples_per_batch, self.hidden_size),
+                torch.zeros(self.num_lstm_layers, examples_per_batch, self.hidden_size))
 
     #-------------------------------------------------------------------------------------------
     def do_forward_batch_and_get_loss(self, loss_function, examples_per_batch, state, is_training):
