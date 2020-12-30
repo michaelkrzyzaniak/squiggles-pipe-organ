@@ -12,6 +12,8 @@ import random
 from mido import MidiFile
 from mido import MidiTrack
 from mido import Message
+import soundfile
+
 
 class LSTM_Harmonizer(nn.Module) :
     #-------------------------------------------------------------------------------------------
@@ -22,25 +24,25 @@ class LSTM_Harmonizer(nn.Module) :
         self.lowest_midi_note = 36
         self.highest_midi_note = 96
         
-        self.sequence_length = 64
+        self.sequence_length = 1#64
         
-        self.input_size = 1024
+        self.input_size = 2048
         self.hop_size = self.input_size // 2
+        self.hidden_size = 256
         self.output_size = self.highest_midi_note - self.lowest_midi_note + 1
-        self.hidden_size = self.output_size#265
         self.num_lstm_layers = 1
         
         #supposedly runs faster with batch_first = false
-        # use torch.transpose(tensor_name, 0, 1)
-        self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=self.num_lstm_layers, batch_first=True)
+        #self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, num_layers=self.num_lstm_layers, batch_first=False)
+        #self.lstm = nn.LSTMCell(input_size=self.input_size, hidden_size=self.hidden_size)
         #self.fc_out = nn.Linear(self.hidden_size, self.output_size)
         #self.fc_out_activation = torch.nn.Sigmoid()
         
-        #self.layer_1      = torch.nn.Linear(self.input_size + self.output_size, self.hidden_size);
-        #self.activation_1 = torch.nn.ReLU()
+        self.layer_1      = torch.nn.Linear(self.input_size + self.output_size, self.hidden_size);
+        self.activation_1 = torch.nn.ReLU()
         #self.activation_1 = torch.nn.Tanh()
-        #self.layer_2      = torch.nn.Linear(self.hidden_size, self.output_size);
-        #self.activation_2 = torch.nn.Sigmoid()
+        self.layer_2      = torch.nn.Linear(self.hidden_size, self.output_size);
+        self.activation_2 = torch.nn.Sigmoid()
         
         #this helps these get saved and restored correctly.
         self.use_cpu                  = use_cpu
@@ -103,9 +105,9 @@ class LSTM_Harmonizer(nn.Module) :
         spectra = np.fft.rfft(audio)
         
         #cancel noise
-        for i in range(len(spectra)) :
-            if abs(spectra[i]) < 0.0002 : #-74 dB
-                spectra[i]= 0+0j
+        #for i in range(len(spectra)) :
+        #    if abs(spectra[i]) < 0.0002 : #-74 dB
+        #        spectra[i]= 0+0j
   
         #square it(dft of autocorrelation)
         conjuga = np.conjugate(spectra)
@@ -192,6 +194,7 @@ class LSTM_Harmonizer(nn.Module) :
     
         mid = os.path.basename(wav)
         mid = mid.replace("_{}.wav".format(input_voice_mask), "_{}.mid".format(output_voice_mask))
+        #mid = mid.replace(".wav", ".mid")
         mid = os.path.join(midi_directory, mid)
         return wav, mid
         
@@ -205,11 +208,12 @@ class LSTM_Harmonizer(nn.Module) :
             return None, None
         
         audio = [];
-        start_sample = np.random.randint(0, wav_length_in_samples-sequence_length_in_samples-1)
+        start_sample = np.random.randint(self.input_size, wav_length_in_samples-sequence_length_in_samples-1)
         for i in range(self.sequence_length):
             s = start_sample + (i*self.hop_size)
             audio.append(wav[s : s+self.input_size])
             audio[i] = self.calculate_audio_features(audio[i])
+        
 
         output_array = []
         midi_file = MidiFile(midi_filename)
@@ -219,10 +223,19 @@ class LSTM_Harmonizer(nn.Module) :
         for i in range(self.sequence_length):
             notes = self.get_active_MIDI_notes_in_time_range(midi_file, start_secs, end_secs)
             output_array.append(self.output_notes_to_vector(notes))
+    
+            #autoregressive input (todo: could be optimized b/c sequential input)
+            prev_start_secs = (start_secs - self.hop_size) / sr
+            prev_notes = self.get_active_MIDI_notes_in_time_range(midi_file, prev_start_secs, start_secs)
+            prev_output_array = self.output_notes_to_vector(prev_notes);
+            audio[i] = np.concatenate((audio[i], prev_output_array))
+    
             start_secs += hop_secs
             end_secs += hop_secs
-        
-        return audio, output_array
+    
+        #FOR TESTING ONLY!
+        return audio[0], output_array[0]
+        #return audio, output_array
         
     #-------------------------------------------------------------------------------------------
     def get_random_training_example_from_file(self, audio_basename, is_training=True):
@@ -254,6 +267,13 @@ class LSTM_Harmonizer(nn.Module) :
         return audio, output_array
 
     #-------------------------------------------------------------------------------------------
+    def get_random_training_sequence(self, is_training=True):
+
+        wav, mid = self.get_random_training_filename_pair()
+        x, y = self.get_random_training_sequence_from_file(wav, mid)
+        return x, y
+
+    #-------------------------------------------------------------------------------------------
     def get_random_training_batch(self, examples_per_batch, is_training=True):
         input_data = [];
         output_data = [];
@@ -265,6 +285,14 @@ class LSTM_Harmonizer(nn.Module) :
             x, y = self.get_random_training_sequence_from_file(wav, mid)
             input_data.append(x)
             output_data.append(y)
+
+        #LSTM wants the indeces to be [sequence][batch][inputs]
+        #torch.transpose(input_data , 0, 1)
+        #torch.transpose(output_data, 0, 1)
+        
+        #testing only, remove sequence data
+        #input_data = input_data[0]
+        #output_data = output_data[0]
 
         return input_data, output_data
     
@@ -288,29 +316,40 @@ class LSTM_Harmonizer(nn.Module) :
     
     #-------------------------------------------------------------------------------------------
     def forward(self, x, prev_state) :
-        hidden, state = self.lstm(x, prev_state)
-        #output = self.fc_out_activation(self.fc_out(hidden))
-        return output, state;
+        #hidden, state = self.lstm(x, prev_state)
+        #h_t, c_t = self.lstm(x, prev_state)
+        #output = self.fc_out_activation(self.fc_out(h_t))
+        
+        hidden   = self.activation_1(self.layer_1(x))
+        output   = self.activation_2(self.layer_2(hidden))
+        
+        return output, prev_state
+        #return output, (h_t, c_t);
 
     #-------------------------------------------------------------------------------------------
-    def get_initial_state(self, examples_per_batch) :
+    def get_initial_state(self, sequence_length) :
         #(cell state vector, hidden (output) state vector)
         # first argurment is num_layers
-        return (torch.zeros(self.num_lstm_layers, examples_per_batch, self.hidden_size),
-                torch.zeros(self.num_lstm_layers, examples_per_batch, self.hidden_size))
+        # For LSTM
+        #return (torch.zeros(self.num_lstm_layers, examples_per_batch, self.hidden_size),
+        #        torch.zeros(self.num_lstm_layers, examples_per_batch, self.hidden_size))
+
+        # For LSTMCell
+        return (torch.zeros(sequence_length, self.hidden_size),
+                torch.zeros(sequence_length, self.hidden_size))
 
     #-------------------------------------------------------------------------------------------
-    def do_forward_batch_and_get_loss(self, loss_function, examples_per_batch, state, is_training):
+    def do_forward_batch_and_get_loss(self, examples_per_batch, state, is_training):
         if is_training is True:
             self.train()
         else:
             self.eval()
         
         #loss_function = torch.nn.MSELoss()
-        #loss_function = torch.nn.BCELoss()
+        loss_function = torch.nn.BCELoss()
         input, target_output = self.get_random_training_batch(examples_per_batch, is_training)
+        #input, target_output = self.get_random_training_sequence(is_training)
         input = torch.FloatTensor(input)
-        
         target_output = torch.FloatTensor(target_output)
         
         if self.use_cpu == False:
@@ -329,13 +368,14 @@ class LSTM_Harmonizer(nn.Module) :
         start = time.time()
         
         #todo: how often to init state? Tutorial has once per epoch...
-        loss_function = torch.nn.BCELoss()
+        #loss_function = torch.nn.BCELoss()
         
         for batch in range(self.get_saved_num_batches(), num_batches) :
             optimizer.zero_grad()
-            state = self.get_initial_state(examples_per_batch)
+            #state = self.get_initial_state(examples_per_batch)
+            state = self.get_initial_state(self.sequence_length)
             
-            loss, state = self.do_forward_batch_and_get_loss(loss_function, examples_per_batch, state, True)
+            loss, state = self.do_forward_batch_and_get_loss(examples_per_batch, state, True)
             loss.backward()
             #torch.nn.utils.clip_grad_norm_(self.parameters(), 1)
             optimizer.step()
@@ -359,9 +399,9 @@ class LSTM_Harmonizer(nn.Module) :
 
     #-------------------------------------------------------------------------------------------
     def sample(self):
-        self.reverse_synthesize_gold_standard("Josquin")
-        self.reverse_synthesize_gold_standard("Fugue")
-        self.reverse_synthesize_gold_standard("Flute")
+        #self.reverse_synthesize_gold_standard("Josquin")
+        #self.reverse_synthesize_gold_standard("Fugue")
+        #self.reverse_synthesize_gold_standard("Flute")
         self.reverse_synthesize_gold_standard("MIDI")
     
     #-------------------------------------------------------------------------------------------
@@ -382,8 +422,8 @@ class LSTM_Harmonizer(nn.Module) :
         #smoothing_coefficient = 0.99
         frames_since_last_event = 0
         
-        on_for = 4.0
-        off_for = 4.0
+        on_for = 3.0
+        off_for = 3.0
         on_count = np.zeros(self.output_size)
         
         self.eval();
@@ -393,10 +433,16 @@ class LSTM_Harmonizer(nn.Module) :
         
             input = wav[start_sample : start_sample + self.input_size]
             
-            input = [[self.calculate_audio_features(input)]]
-            #prev_output_vector = self.output_notes_to_vector(prev_notes)
-            #input = np.concatenate((input, prev_output_vector))
+            #input = [[self.calculate_audio_features(input)]]
+            #input = [self.calculate_audio_features(input)]
+            input = self.calculate_audio_features(input)
+            
+            #autoregressive input
+            prev_output_vector = self.output_notes_to_vector(prev_notes)
+            input = np.concatenate((input, prev_output_vector))
             #input = np.concatenate((input, output.detach().numpy()))
+            
+            #input = np.multiply(input, 2);
             
             #input = np.multiply(input, 1.0-smoothing_coefficient);
             #smoothed_spectrum = np.multiply(input, smoothing_coefficient);
@@ -406,12 +452,15 @@ class LSTM_Harmonizer(nn.Module) :
             
             input = torch.FloatTensor(input)
             output, state = self.forward(input, state)
-            output = output[0][0]; #remove superfluous dimensions
+            #output = output[0]; #remove superfluous dimensions
             
-            
+            #output = output * 100000;
+
+            max_output_index = output.argmax();
             
             for i in range(len(output)) :
-                if np.random.sample() < output[i] :
+                #if np.random.sample() < output[i] :
+                if i == max_output_index :
                     on_count[i] += 1.0 / on_for
                     if on_count[i] > 1 :
                         on_count[i] = 1

@@ -290,9 +290,9 @@ class Multiple_F0(nn.Module) :
 
     #-------------------------------------------------------------------------------------------
     def sample(self):
-        self.reverse_synthesize_gold_standard("Josquin")
-        self.reverse_synthesize_gold_standard("Fugue")
-        self.reverse_synthesize_gold_standard("Flute")
+        #self.reverse_synthesize_gold_standard("Josquin")
+        #self.reverse_synthesize_gold_standard("Fugue")
+        #self.reverse_synthesize_gold_standard("Flute")
         self.reverse_synthesize_gold_standard("MIDI")
     
     #-------------------------------------------------------------------------------------------

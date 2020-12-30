@@ -6,7 +6,7 @@ python train.py \
      --data_root=data \
      --sessions_root=lstm_sessions \
      --data_folder=bach_multiinstrumental \
-     --session_folder=lstm_test_1  \
+     --session_folder=lstm_test_2  \
      --use_cpu=True \
-     --gold_standard="Fugue"
+     --gold_standard="Bach	"
 deactivate

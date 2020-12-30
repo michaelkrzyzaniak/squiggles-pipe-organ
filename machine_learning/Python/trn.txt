@@ -7,7 +7,7 @@ python train.py \
      --sessions_root=lstm_sessions \
      --data_folder=bach_multiinstrumental \
      --session_folder=lstm_test_2 \
-     --num_batches=2000 \
-     --save_every=500 \
+     --num_batches=5000 \
+     --save_every=1000 \
      --use_cpu=True
 deactivate
