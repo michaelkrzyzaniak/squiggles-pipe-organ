@@ -9,9 +9,9 @@ default_data_root         = "data"
 default_num_batches       = 1000
 default_learning_rate     = 1e-4
 default_use_cpu           = "False"
-default_save_every        = 50
+default_save_every        = 500
 default_gold_standard     = ""
-examples_per_batch        = 64  
+examples_per_batch        = 1#64
 
 parser = argparse.ArgumentParser(description='Wave RNN Network')
 parser.add_argument('--sessions_root' , type=str, default=default_sessions_root, help='sessions folder. Default: ' + default_sessions_root + '.')
