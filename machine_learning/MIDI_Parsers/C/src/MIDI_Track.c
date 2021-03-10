@@ -27,6 +27,8 @@ MIDI_Track*  midi_track_deep_copy(MIDI_Track* self)
     {
       List* l = midi_track_get_event_list(self);
       MIDI_Event* event;
+      
+      //check, self->list or l?
       list_iterator_t i = list_reset_iterator(self->list);
       while((event = list_advance_iterator(self->list, &i)) != NULL)
         {
