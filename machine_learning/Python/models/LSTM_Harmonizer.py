@@ -24,7 +24,7 @@ class LSTM_Harmonizer(nn.Module) :
         self.lowest_midi_note = 36
         self.highest_midi_note = 96
         
-        self.sequence_length = 64
+        self.sequence_length = 256
         
         self.input_size = 2048
         self.hop_size = self.input_size // 2
@@ -36,17 +36,19 @@ class LSTM_Harmonizer(nn.Module) :
         self.lstm_hidden_size = self.output_size
         
         #supposedly runs faster with batch_first = false
-        #self.lstm = nn.LSTM(input_size=self.lstm_input_size, hidden_size=self.lstm_hidden_size, num_layers=self.num_lstm_layers, batch_first=False)
-        self.lstm = torch.nn.RNN(input_size=self.lstm_input_size, hidden_size=self.lstm_hidden_size, num_layers=self.num_lstm_layers);
+        self.lstm = nn.LSTM(input_size=self.lstm_input_size, hidden_size=self.lstm_hidden_size, num_layers=self.num_lstm_layers, batch_first=False)
+        #self.lstm = torch.nn.RNN(input_size=self.lstm_input_size, hidden_size=self.lstm_hidden_size, num_layers=self.num_lstm_layers);
         #self.lstm = nn.LSTMCell(input_size=self.lstm_input_size, hidden_size=self.lstm_hidden_size)
         #self.fc_out = nn.Linear(self.hidden_size, self.output_size)
         #self.lstm_out_activation = torch.nn.Sigmoid()
         
-        self.lstm_out_activation = torch.nn.LogSoftmax(dim = 1)
+        #self.lstm_out_activation = torch.nn.LogSoftmax(dim = 1)
         
         self.layer_1      = torch.nn.Linear(self.input_size + self.output_size, self.hidden_size);
-        self.activation_1 = torch.nn.ReLU()
-        #self.layer_2      = torch.nn.Linear(self.hidden_size, self.output_size);
+        #self.activation_1 = torch.nn.ReLU()
+        
+        
+        self.layer_2      = torch.nn.Linear(self.output_size, self.output_size);
         #self.activation_2 = torch.nn.Sigmoid()
         
         #this helps these get saved and restored correctly.
@@ -309,11 +311,15 @@ class LSTM_Harmonizer(nn.Module) :
         #h_t, c_t = self.lstm(x, prev_state)
         #output = self.fc_out_activation(self.fc_out(h_t))
       
-        hidden   = self.activation_1(self.layer_1(x))
+        hidden   = self.layer_1(x)
+        #hidden   = self.activation_1(self.layer_1(x))
         #h_t, c_t = self.lstm(hidden, prev_state) # lstmCell
         lstm_out, prev_state = self.lstm(hidden.view(x.shape[0], 1, -1), prev_state)
         
-        output = self.lstm_out_activation(lstm_out.view(x.shape[0], -1))
+        #output = self.lstm_out_activation(lstm_out.view(x.shape[0], -1))
+        
+        output = self.layer_2(lstm_out.view(x.shape[0], -1))
+        
         return output, prev_state
         #return output, (h_t, c_t);
 
@@ -322,26 +328,28 @@ class LSTM_Harmonizer(nn.Module) :
         #(cell state vector, hidden (output) state vector)
         # first argurment is num_layers
         # For LSTM
-        #return (torch.zeros(self.num_lstm_layers, examples_per_batch, self.lstm_hidden_size),
-        #        torch.zeros(self.num_lstm_layers, examples_per_batch, self.lstm_hidden_size))
+        return (torch.zeros(self.num_lstm_layers, examples_per_batch, self.lstm_hidden_size),
+                torch.zeros(self.num_lstm_layers, examples_per_batch, self.lstm_hidden_size))
 
         # For LSTMCell
         #return (torch.zeros(sequence_length, self.lstm_hidden_size),
         #        torch.zeros(sequence_length, self.lstm_hidden_size))
         
         # For RNN
-        return torch.zeros(self.num_lstm_layers, examples_per_batch, self.lstm_hidden_size)
+        # return torch.zeros(self.num_lstm_layers, examples_per_batch, self.lstm_hidden_size)
 
     #-------------------------------------------------------------------------------------------
+    #https://closeheat.com/blog/pytorch-lstm-text-generation-tutorial
     def do_forward_batch_and_get_loss(self, examples_per_batch, state, is_training):
         if is_training is True:
             self.train()
         else:
             self.eval()
         
+        loss_function = nn.CrossEntropyLoss()
         #loss_function = torch.nn.MSELoss()
         #loss_function = torch.nn.BCELoss()
-        loss_function = torch.nn.NLLLoss()
+        #loss_function = torch.nn.NLLLoss()
         #input, target_output = self.get_random_training_batch(examples_per_batch, is_training)
         input, target_output = self.get_random_training_sequence(is_training)
         
@@ -401,11 +409,19 @@ class LSTM_Harmonizer(nn.Module) :
 
     #-------------------------------------------------------------------------------------------
     def sample(self):
-        #self.reverse_synthesize_gold_standard("Josquin")
+        self.reverse_synthesize_gold_standard("Josquin")
         #self.reverse_synthesize_gold_standard("Fugue")
-        #self.reverse_synthesize_gold_standard("Flute")
+        self.reverse_synthesize_gold_standard("Flute")
         self.reverse_synthesize_gold_standard("MIDI")
-    
+  
+  
+    #-------------------------------------------------------------------------------------------
+    def sample_softmax_with_temperature(self, x, temperature) :
+        #todo: re-implement temperature (x / temperature prior to softmax)
+        x = x / temperature
+        p = torch.nn.functional.softmax(x, dim=0).detach().numpy()
+        return np.random.choice(len(x), p=p)
+        
     #-------------------------------------------------------------------------------------------
     def reverse_synthesize_gold_standard(self, filename) :
         gold_standards = glob.glob(os.path.join(self.data_directory, "Validation/Gold_Standard/", filename + ".wav"))
@@ -424,8 +440,8 @@ class LSTM_Harmonizer(nn.Module) :
         #smoothing_coefficient = 0.99
         frames_since_last_event = 0
         
-        on_for = 1.0
-        off_for = 1.0
+        on_for = 2.0
+        off_for = 2.0
         on_count = np.zeros(self.output_size)
         
         self.eval();
@@ -443,7 +459,8 @@ class LSTM_Harmonizer(nn.Module) :
             #autoregressive input
             prev_output_vector = self.output_notes_to_vector(prev_notes)
             input = [np.concatenate((input, prev_output_vector))]
-            #input = np.concatenate((input, output.detach().numpy()))
+            
+            #input = [np.concatenate((input, output.detach().numpy()))]
             
             #input = np.multiply(input, 2);
             
@@ -460,7 +477,11 @@ class LSTM_Harmonizer(nn.Module) :
             #output = output * 100000;
             #print(output)
 
-            max_output_index = output.argmax().item();
+            #max_output_index = output.argmax().item();
+            #not really the max, just a sample with temperature
+            temperature = 0.01
+            max_output_index = self.sample_softmax_with_temperature(output, temperature);
+            
             
             for i in range(len(output)) :
                 #if np.random.sample() < output[i] :

@@ -32,7 +32,7 @@ void (*midi_realtime_event_handler       ) (midi_realtime_status_t              
 
 /*----------------------------------------------------------------------*/
 void midi_parse(uint8_t stream)
-{ 
+{
   if((stream == MIDI_STATUS_END_OF_EXCLUSIVE) && (state == MIDI_PARSING_SYSEX))
     {
       if((b - midi_buffer) >= MIDI_BUFFER_SIZE)
@@ -56,7 +56,7 @@ void midi_parse(uint8_t stream)
       b = midi_buffer; *b++ = stream;
 
       switch(stream & MIDI_CHANNEL_MASK_ANY)
-        {    
+        {
           case MIDI_STATUS_NOTE_OFF:
           case MIDI_STATUS_NOTE_ON:
           case MIDI_STATUS_POLYPHONIC_AFTERTOUCH:
@@ -94,12 +94,12 @@ void midi_parse(uint8_t stream)
 
 /*----------------------------------------------------------------------*/
 void midi_message_dispatch(uint8_t* message)
-{ 
+{
   midi_status_t  status  = message[0] & MIDI_CHANNEL_MASK_ANY;
   midi_channel_t channel = message[0] & MIDI_CHANNEL_MASK;
   
   switch(status)
-    {    
+    {
       case MIDI_STATUS_NOTE_ON:
         if(message[2] != 0)
           {
@@ -133,7 +133,7 @@ void midi_message_dispatch(uint8_t* message)
         else
           {
             if(midi_control_change_event_handler != NULL)
-              midi_control_change_event_handler(channel, message[1], message[2]);          
+              midi_control_change_event_handler(channel, message[1], message[2]);
           }
         break;
 
