@@ -15,26 +15,24 @@ multi-thread support and many small changes
 #include "Harmonizer.h"
 #include "STFT.h"
 
-#include "AudioSuperclass.h"
-
 void harmonizer_stft_process_callback(void* SELF, dft_sample_t* real, int N);
-
 
 /*--------------------------------------------------------------------*/
 struct opaque_harmonizer_struct
 {
   unsigned num_audio_inputs;
-  
   unsigned num_outputs;
-  
   unsigned num_layer_1_inputs;
   unsigned num_layer_2_inputs;
   unsigned num_layer_3_inputs;
+  unsigned lowest_midi_note;
+  
+  void* note_changed_callback_self;
+  harmonizer_note_changed_callback_t note_changed_callback;
   
   STFT_Autocorr*   stft;
   
   Matrix* audio_features;
-  
   Matrix* input_vector;
   
   Matrix* layer_1_weights;
@@ -68,7 +66,6 @@ struct opaque_harmonizer_struct
   Matrix* layer_3_weights;
   Matrix* layer_3_biases;
   Matrix* layer_3_out;
-
 };
 
 /*-----------------------------------------------------------------------*/
@@ -162,6 +159,9 @@ Harmonizer* harmonizer_new(char* folder)
       self->stft = stft_autocorr_new(self->num_audio_inputs, 2);
       if(self->stft == NULL)
         return harmonizer_destroy(self);
+        
+      self->note_changed_callback = NULL;
+      self->lowest_midi_note = 36;
     }
   return self;
 }
@@ -203,6 +203,14 @@ Harmonizer*       harmonizer_destroy               (Harmonizer* self)
     }
   return (Harmonizer* ) NULL;
 }
+
+/*-----------------------------------------------------------------------*/
+void harmonizer_set_note_changed_callback(Harmonizer* self, harmonizer_note_changed_callback_t callback,  void* callback_self)
+{
+  self->note_changed_callback = callback;
+  self->note_changed_callback_self = callback_self;
+}
+
 
 /*-----------------------------------------------------------------------*/
 matrix_val_t harmonizer_sigmoid(void* SELF, matrix_val_t x)
@@ -396,6 +404,13 @@ void harmonizer_stft_process_callback(void* SELF, dft_sample_t* real, int N)
   Matrix* outputs = harmonizer_forward(self, self->input_vector);
   //harmonizer_softmax_with_temperature(outputs, 0.01);
   int  chosen_output_index = harmonizer_argmax(outputs);
+  int note = self->lowest_midi_note + chosen_output_index;
+  
+  
+  if(self->note_changed_callback != NULL)
+    self->note_changed_callback(self->note_changed_callback_self, note);
+  
+  fprintf(stderr, "MIDI: %i\r\n", note);
   
   //make output onehot for next input
   matrix_fill_zeros(outputs);

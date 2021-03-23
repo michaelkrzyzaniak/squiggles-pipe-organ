@@ -36,8 +36,8 @@ extern "C"{
 #endif
 
 //#include "MKAiff.h"
-//#include "fastsin.h"
-#define SIN_TWO_PI 0xFFFFFFFF
+#include "fastsin.h"
+//#define SIN_TWO_PI 0xFFFFFFFF
 
 #ifndef BOOL
 #define BOOL int
