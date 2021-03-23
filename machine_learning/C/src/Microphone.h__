@@ -1,0 +1,34 @@
+/*
+ *  Synth.h
+ *  Make weird noises
+ *
+ *  Made by Michael Krzyzaniak at Arizona State University's
+ *  School of Arts, Media + Engineering in Spring of 2013
+ *  mkrzyzan@asu.edu
+ */
+
+#ifndef __MICROPHONE__
+#define __MICROPHONE__ 1
+
+#if defined(__cplusplus)
+extern "C"{
+#endif   //(__cplusplus)
+
+#include "AudioSuperclass.h"
+#include "../Rhythm_Generators/Rhythm_Generators.h"
+#include "../../Beat-and-Tempo-Tracking/BTT.h"
+#include "../../Robot_Communication_Framework/Robot_Communication.h"
+
+typedef struct OpaqueHarmonizerControllerStruct HarmonizerController;
+
+HarmonizerController*       mic_new                        ();
+int                         mic_audio_callback             (void* SELF, auSample_t* buffer, int num_frames, int num_channels);
+
+//Microphone*  mic_destroy             (Microphone*      self      );
+//call with self->destroy(self);
+
+#if defined(__cplusplus)
+}
+#endif   //(__cplusplus)
+
+#endif   // __MICROPHONE__

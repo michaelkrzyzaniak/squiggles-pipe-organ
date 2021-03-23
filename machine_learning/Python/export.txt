@@ -3,10 +3,9 @@
 source venv/bin/activate
 
 python main.py \
-     --data_root=data \
      --sessions_root=lstm_sessions \
-     --data_folder=Toy \
      --session_folder=lstm_test  \
+     --data_folder=required_but_ignored \
      --use_cpu=True \
-     --sample=True
+     --export=True
 deactivate

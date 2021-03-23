@@ -2,12 +2,12 @@
 
 source venv/bin/activate
 
-python train.py \
+python main.py \
      --data_root=data \
      --sessions_root=lstm_sessions \
-     --data_folder=bach_multiinstrumental \
+     --data_folder=Toy \
      --session_folder=lstm_test \
-     --num_batches=6000 \
-     --save_every=1000 \
+     --num_batches=10000 \
+     --save_every=500\
      --use_cpu=True
 deactivate
