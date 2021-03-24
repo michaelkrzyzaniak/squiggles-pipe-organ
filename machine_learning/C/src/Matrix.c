@@ -597,36 +597,26 @@ matrix_ret_t matrix_transpose(Matrix* self, Matrix* result)
 /*--------------------------------------------------------------------*/
 matrix_ret_t matrix_post_multiply_vector(Matrix* self, Matrix* vector, Matrix* result)
 {
-  return matrix_multiply_multithread(self, vector, result);
-  /*
   if(self->cols != vector->rows)
     return MATRIX_NOT_CONFORMABLE;
   if((self->rows != result->rows) || (vector->cols != result->cols))
     return MATRIX_NOT_CONFORMABLE;
     
-  unsigned i, j, x, y;// a[100][100], b[100], c[100];
+  unsigned i, j, x, y;
   
   unsigned vector_rows  = vector->rows;
   unsigned result_rows  = result->rows;
   
   matrix_fill_zeros(result);
   
-  for (i=0; i<result_rows; i+=4)
-    {
-      for(j=0; j<vector_rows; j+=4)
-        {
-          for(x=i; x<min(i+4, result_rows); x++)
-            {
-              for(y=j; y<min(j+4, vector_rows); y++)
-                {
-                  //c[x] = c[x] + a[x][y] * b[y];
-                  IX(result, x, 0) += IX(self, x, y) * IX(vector, y, 0);
-                }
-            }
-        }
-    }
+  for(i=0; i<result_rows; i+=4)
+    for(j=0; j<vector_rows; j+=4)
+      for(x=i; x<min(i+4, result_rows); x++)
+        for(y=j; y<min(j+4, vector_rows); y++)
+          IX(result, x, 0) += IX(self, x, y) * IX(vector, y, 0);
+
   return MATRIX_CONFORMABLE;
-  */
+
 }
 
 /*--------------------------------------------------------------------*/
@@ -644,6 +634,33 @@ matrix_ret_t matrix_multiply(Matrix* self, Matrix* multiplicand_or_null_self, Ma
     return MATRIX_NOT_CONFORMABLE;
 
   unsigned i, j, k;
+ 
+/*
+  matrix_val_t *self_i_0, *self_i_j;
+  matrix_val_t *multiplicand_j_0, *multiplicand_j_k;
+  matrix_val_t *result_i_k = result->vals;
+
+  self_i_0 = self->vals;
+  for(i=0; i<self->rows; i++)
+    {
+      multiplicand_j_0 = multiplicand->vals;
+      for(k=0; k<multiplicand->cols; k++)
+        {
+          self_i_j = self_i_0;
+          multiplicand_j_k = multiplicand_j_0;
+          *result_i_k = 0;
+          for(j=0; j<multiplicand->rows; j++)
+            {
+              *result_i_k += *self_i_j * *multiplicand_j_k;
+              ++self_i_j;
+              multiplicand_j_k += multiplicand->cols;
+            }
+          ++result_i_k;
+          ++multiplicand_j_0;
+        }
+      self_i_0 += self->cols;
+    }
+*/
 
   for(i=0; i<self->rows; i++)
     {
@@ -654,6 +671,7 @@ matrix_ret_t matrix_multiply(Matrix* self, Matrix* multiplicand_or_null_self, Ma
             IX(result, i, k) += IX(self, i, j) * IX(multiplicand, j, k);
         }
     }
+
   return MATRIX_CONFORMABLE;
 }
 
@@ -670,7 +688,7 @@ void*  matrix_multiply_thread_private (void* THREAD_DATA)
   unsigned end_row     = thread_data->end_row;
   
   unsigned i, j, k;
-  /*
+
   matrix_val_t *self_i_0, *self_i_j;
   matrix_val_t *multiplicand_j_0, *multiplicand_j_k;
   matrix_val_t *result_i_k = &IX(result, start_row, 0);
@@ -689,15 +707,15 @@ void*  matrix_multiply_thread_private (void* THREAD_DATA)
             {
               *result_i_k += *self_i_j * *multiplicand_j_k;
               ++self_i_j;
-              multiplicand_j_k += self->rows;
+              multiplicand_j_k += multiplicand->cols;
             }
           ++result_i_k;
           ++multiplicand_j_0;
         }
       self_i_0 += self->cols;
     }
-    */
 
+/*
   for(i=start_row; i<end_row; i++)
     {
       for(k=0; k<multiplicand->cols; k++)
@@ -707,7 +725,7 @@ void*  matrix_multiply_thread_private (void* THREAD_DATA)
             IX(result, i, k) += IX(self, i, j) * IX(multiplicand, j, k);
         }
     }
-
+*/
   return NULL;
 }
 #endif

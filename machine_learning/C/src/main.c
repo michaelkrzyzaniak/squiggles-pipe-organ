@@ -20,7 +20,6 @@ int main(void)
 
 int _main(void)
 {
-
   unsigned num_tests = 100;
   unsigned a_rows = 2411;
   unsigned a_cols = 1235;
@@ -44,7 +43,7 @@ int _main(void)
 
   timestamp_microsecs_t start_2 = timestamp_get_current_time();
   for(i=0;  i<num_tests; i++)
-    matrix_post_multiply_vector(a, b, result_2);
+    matrix_multiply_multithread(a, b, result_2);
   timestamp_microsecs_t end_2 = timestamp_get_current_time();
   
   //matrix_print(a);

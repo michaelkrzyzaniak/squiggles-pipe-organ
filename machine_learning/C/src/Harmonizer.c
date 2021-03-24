@@ -26,6 +26,8 @@ struct opaque_harmonizer_struct
   unsigned num_layer_2_inputs;
   unsigned num_layer_3_inputs;
   unsigned lowest_midi_note;
+  unsigned prev_note_out;
+  unsigned note_timer;
   
   void* note_changed_callback_self;
   harmonizer_note_changed_callback_t note_changed_callback;
@@ -285,33 +287,33 @@ void harmonizer__init_state(Harmonizer* self)
 Matrix* harmonizer_forward(Harmonizer* self, Matrix* inputs)
 {
   //linear fully connected layer
-  matrix_post_multiply_vector(self->layer_1_weights, inputs, self->layer_1_out);
+  matrix_multiply(self->layer_1_weights, inputs, self->layer_1_out);
   matrix_add(self->layer_1_out, self->layer_1_biases, NULL);
   matrix_apply_function(self->layer_1_out, harmonizer_relu, self, NULL);
   
   //LSTM Layer
   //https://en.wikipedia.org/wiki/Long_short-term_memory
   //https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
-  matrix_post_multiply_vector(self->lstm_Wf, self->layer_1_out, self->lstm_temp_w);
-  matrix_post_multiply_vector(self->lstm_Uf, self->lstm_h_t, self->lstm_temp_u);
+  matrix_multiply(self->lstm_Wf, self->layer_1_out, self->lstm_temp_w);
+  matrix_multiply(self->lstm_Uf, self->lstm_h_t, self->lstm_temp_u);
   matrix_add(self->lstm_temp_w, self->lstm_temp_u, self->lstm_f_t);
   matrix_add(self->lstm_f_t, self->lstm_bf, NULL);
   matrix_apply_function(self->lstm_f_t, harmonizer_sigmoid, self, NULL);
   
-  matrix_post_multiply_vector(self->lstm_Wi, self->layer_1_out, self->lstm_temp_w);
-  matrix_post_multiply_vector(self->lstm_Ui, self->lstm_h_t, self->lstm_temp_u);
+  matrix_multiply(self->lstm_Wi, self->layer_1_out, self->lstm_temp_w);
+  matrix_multiply(self->lstm_Ui, self->lstm_h_t, self->lstm_temp_u);
   matrix_add(self->lstm_temp_w, self->lstm_temp_u, self->lstm_i_t);
   matrix_add(self->lstm_i_t, self->lstm_bi, NULL);
   matrix_apply_function(self->lstm_i_t, harmonizer_sigmoid, self, NULL);
 
-  matrix_post_multiply_vector(self->lstm_Wo, self->layer_1_out, self->lstm_temp_w);
-  matrix_post_multiply_vector(self->lstm_Uo, self->lstm_h_t, self->lstm_temp_u);
+  matrix_multiply(self->lstm_Wo, self->layer_1_out, self->lstm_temp_w);
+  matrix_multiply(self->lstm_Uo, self->lstm_h_t, self->lstm_temp_u);
   matrix_add(self->lstm_temp_w, self->lstm_temp_u, self->lstm_o_t);
   matrix_add(self->lstm_o_t, self->lstm_bo, NULL);
   matrix_apply_function(self->lstm_o_t, harmonizer_sigmoid, self, NULL);
 
-  matrix_post_multiply_vector(self->lstm_Wg, self->layer_1_out, self->lstm_temp_w);
-  matrix_post_multiply_vector(self->lstm_Ug, self->lstm_h_t, self->lstm_temp_u);
+  matrix_multiply(self->lstm_Wg, self->layer_1_out, self->lstm_temp_w);
+  matrix_multiply(self->lstm_Ug, self->lstm_h_t, self->lstm_temp_u);
   matrix_add(self->lstm_temp_w, self->lstm_temp_u, self->lstm_g_t);
   matrix_add(self->lstm_g_t, self->lstm_bg, NULL);
   matrix_apply_function(self->lstm_g_t, harmonizer_tanh, self, NULL);
@@ -324,7 +326,7 @@ Matrix* harmonizer_forward(Harmonizer* self, Matrix* inputs)
   matrix_multiply_pointwise(self->lstm_h_t, self->lstm_o_t, NULL);
   
   //Final linear fully connected layer
-  matrix_post_multiply_vector(self->layer_3_weights, self->lstm_h_t, self->layer_3_out);
+  matrix_multiply(self->layer_3_weights, self->lstm_h_t, self->layer_3_out);
   matrix_add(self->layer_3_out, self->layer_3_biases, NULL);
   
   return self->layer_3_out;
@@ -392,20 +394,25 @@ void harmonizer_stft_process_callback(void* SELF, dft_sample_t* real, int N)
 {
   Harmonizer* self = SELF;
   
-  int counter = 0;
   int i;
 
   for(i=0; i<N; i++)
     matrix_set_value(self->input_vector, i, 0, real[i]);
 
   matrix_copy_partial(self->layer_3_out, self->input_vector, 0, 0, self->num_audio_inputs, 0, self->num_outputs, 1);
-  matrix_set_value(self->input_vector, self->num_audio_inputs+self->num_outputs, 0, counter);
+  matrix_set_value(self->input_vector, self->num_audio_inputs+self->num_outputs, 0, self->note_timer);
   
   Matrix* outputs = harmonizer_forward(self, self->input_vector);
   //harmonizer_softmax_with_temperature(outputs, 0.01);
   int  chosen_output_index = harmonizer_argmax(outputs);
-  int note = self->lowest_midi_note + chosen_output_index;
-  
+  int note = 0;
+  if(chosen_output_index < matrix_get_num_rows(outputs)-1)
+    note = self->lowest_midi_note + chosen_output_index;
+
+  if(note == self->prev_note_out)
+    ++self->note_timer;
+  else
+    self->note_timer = 0;
   
   if(self->note_changed_callback != NULL)
     self->note_changed_callback(self->note_changed_callback_self, note);
@@ -415,6 +422,7 @@ void harmonizer_stft_process_callback(void* SELF, dft_sample_t* real, int N)
   //make output onehot for next input
   matrix_fill_zeros(outputs);
   matrix_set_value(outputs, chosen_output_index, 0, 1);
+  self->prev_note_out = note;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -425,6 +433,7 @@ void harmonizer_test_io(Harmonizer* self, matrix_val_t* input_arr, matrix_val_t*
   matrix_set_values_array(target_output, output_arr);
   
   matrix_set_values_array(self->input_vector, input_arr);
+
 
   /*
   Matrix* actual_out;
