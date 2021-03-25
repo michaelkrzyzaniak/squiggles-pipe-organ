@@ -15,63 +15,24 @@ int main(int argc, char* argv[])
       if(midi == NULL)
         {perror("Unable to open midi file"); return -1;}
       
-      int   num_tracks = midi_file_get_num_tracks(midi) - 1; //assume first track is metadata
-      int   frames_per_beat = midi_file_get_frames_per_beat(midi);
+      int   num_tracks = midi_file_get_num_tracks(midi); //assume first track is metadata
+      fprintf(stderr, "num_tracks: %i\r\n", num_tracks);
+      //int   frames_per_beat = midi_file_get_frames_per_beat(midi);
       List* tracks  = midi_file_get_track_list(midi);
-      int   track_mask;
-      int   max_track_mask = 1 << num_tracks;
-      int   transpose = -6;
-      int   max_transpose = 6;
-
-      fprintf(stderr, "processing %s -- %i tracks -- %i frames per beat\r\n", *argv, num_tracks, frames_per_beat);
+      list_remove_data_at_index(tracks, 0, 1);
       
-/*
-      int tracknum = 0;
-      MIDI_Track* track;
-      list_iterator_t iter = list_reset_iterator(tracks);
-      while((track = list_advance_iterator(tracks, &iter)) != NULL)
+      MIDI_Track* track = midi_file_get_track_at_index(midi, 0);
+      List* l = midi_track_get_event_list(track);
+      MIDI_Event* event;
+      list_iterator_t i = list_reset_iterator(l);
+      while((event = list_advance_iterator(l, &i)) != NULL)
         {
-          midi_track_test_print_key_signatures(track, tracknum);
-          ++tracknum;
+          uint8_t nibble = midi_event_get_status_nibble(event);
+          if((nibble != MIDI_STATUS_NOTE_ON) && (nibble != MIDI_STATUS_NOTE_OFF))
+            list_remove_data(l, event, 1);
         }
-      continue;
-*/
-      for(/*transpose*/; transpose<max_transpose; transpose++)
-        {
-          for(track_mask=1; track_mask<max_track_mask; track_mask++)
-            {
-              MIDI_File* new_midi = midi_file_new(frames_per_beat);
-              if(new_midi == NULL)
-                { perror("unable to make a new MIDI file"); return -1; }
-
-              int i=0;
-              MIDI_Track* track;
-              list_iterator_t iter = list_reset_iterator(tracks);
-              int mask = (track_mask << 1) + 1; //mask in the metadata track
-              while((track = list_advance_iterator(tracks, &iter)) != NULL)
-                {
-                  if((mask >> i) & 0x01)
-                    {
-                      MIDI_Track* copied_track = midi_track_deep_copy(track);
-                      if(copied_track != NULL)
-                        {
-                          midi_track_transpose(copied_track, transpose);
-                          midi_file_append_track(new_midi, copied_track);
-                        }
-                      else
-                        { perror("unable to make a new MIDI track"); return -1; }
-                    }
-                  ++i;
-                }
-              char* filename;
-              asprintf(&filename, "dataset/%s_%i_%i.mid", *argv, transpose, track_mask);
-              fprintf(stderr, "%s\r\n", filename);
-              midi_file_save_with_filename(new_midi, filename);
-              new_midi = midi_file_destroy(new_midi);
-              free(filename);
-            }
-        }
-      midi_file_destroy(midi);
+      
+      midi_file_save_with_filename(midi, "Stripped_Bach.mid");
     }
 
   return 0;
