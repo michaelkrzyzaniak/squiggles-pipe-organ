@@ -11,7 +11,7 @@ default_learning_rate     = 1e-4
 default_use_cpu           = "False"
 default_export_flag       = "False"
 default_save_every        = 500
-default_sample_flag       = ""
+default_sample_flag       = "False"
 examples_per_batch        = 10#64
 
 parser = argparse.ArgumentParser(description='Wave RNN Network')
@@ -24,7 +24,7 @@ parser.add_argument('--data_folder'   , type=str, default=None                 ,
 parser.add_argument('--save_every'    , type=int, default=default_save_every   , help='How often to save checkpoints' + str(default_save_every) + '.')
 parser.add_argument('--use_cpu'       , type=str, default=default_use_cpu      , help='Should use cpu instead of gpu? Default: ' + str(default_use_cpu) + '.')
 parser.add_argument('--sample'        , type=str, default=default_sample_flag  , help='Sample the network? Default: ' + str(default_sample_flag) + '.')
-parser.add_argument('--export'        , type=str, default=default_export_flag              , help='Export .npy to disk? Default: ' + str(default_export_flag) + '.')
+parser.add_argument('--export'        , type=str, default=default_export_flag  , help='Export .npy to disk? Default: ' + str(default_export_flag) + '.')
 
 args = parser.parse_args()
 

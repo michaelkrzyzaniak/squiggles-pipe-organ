@@ -42,6 +42,7 @@ Beep* beep_destroy(Beep* self)
 void beep_set_note(Beep* self, float midi_note_number)
 {
   self->freq = AU_MIDI2FREQ(midi_note_number);
+  fprintf(stderr, "MIDI: %f, FREQ: %u\r\n", midi_note_number, self->freq);
 }
 
 /*--------------------------------------------------------------------*/
@@ -49,20 +50,23 @@ int beep_audio_callback(void* SELF, auSample_t* buffer, int num_frames, int num_
 {
   Beep* self = SELF;
   
-  //smemset(buffer, 0, sizeof(*buffer) * num_frames * num_channels);
+  //memset(buffer, 0, sizeof(*buffer) * num_frames * num_channels);
 
   int frame, chan;
   auSample_t sample;
+
+  
 
   for(frame=0; frame<num_frames; frame++)
     {
       sample = fastsin(self->phase);
       self->phase += self->freq;
+
       
       for(chan=0; chan<num_channels; chan++)
         *buffer++ = sample;
     }
-  
+
   return  num_frames;
 }
 

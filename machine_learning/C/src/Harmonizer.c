@@ -120,6 +120,13 @@ Harmonizer* harmonizer_new(char* folder)
       self->num_outputs         = matrix_get_num_rows(self->layer_3_weights);
       self->num_audio_inputs    = self->num_layer_1_inputs - self->num_outputs - 1;
       
+      //testing
+      /*
+      Matrix* counter_weights = matrix_new(matrix_get_num_rows(self->layer_1_weights), 1);
+      matrix_copy_col(self->layer_1_weights, matrix_get_num_cols(self->layer_1_weights)-1, counter_weights, 0);
+      matrix_print(counter_weights);
+      */
+      
       //new matrices
       self->audio_features      = matrix_new(self->num_audio_inputs  , 1);
       self->input_vector        = matrix_new(self->num_layer_1_inputs, 1);
@@ -414,10 +421,11 @@ void harmonizer_stft_process_callback(void* SELF, dft_sample_t* real, int N)
   else
     self->note_timer = 0;
   
-  if(self->note_changed_callback != NULL)
-    self->note_changed_callback(self->note_changed_callback_self, note);
+  if(self->prev_note_out != note)
+    if(self->note_changed_callback != NULL)
+      self->note_changed_callback(self->note_changed_callback_self, note);
   
-  fprintf(stderr, "MIDI: %i\r\n", note);
+  //fprintf(stderr, "MIDI: %i\r\n", note);
   
   //make output onehot for next input
   matrix_fill_zeros(outputs);
