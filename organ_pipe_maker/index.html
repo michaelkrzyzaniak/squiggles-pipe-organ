@@ -286,15 +286,14 @@
           </div>
           <div class='w3-container bottom-part'>
             You need to download the .stl file and prepare it for printing using your 3d printer's software, e.g. Ultimaker Cura or Stratasys Insight. Then you can print it. Here is an image of a finished part:
-            <img src="images/3d_1.jpg" alt="Image of 3d printed part sitting an Ultimaker 3 printer after print completed">
-            Here is bigger one that was printed in a different machine:
-            <img src="images/3d_2.jpg" alt="Image of another 3d printed part on a white background">
-            I'm not sure what the best orientation of the part in the machine is. You will probably need to print support material and then remove it.
+            <img src="images/02_3d_in_machine.jpg" class="narrow"  alt="Image of 3d printed part sitting an Ultimaker 3 printer after print completed">
+            I printed it in PLA with water-soluble PVA support material. I used 0.1mm layer height and 20&#37; infill, and otherwise used the Ultimaker default settings. I printed my pipes in the orientation shown, as it minimized the amount of support material needed. This orientation worked well. Here is another photo with the support material removed.
+            <img src="images/04_3d_print_done.jpg" alt="Image of another 3d printed part on a white background">
+            In general I had a lot of difficulty getting the support material to print properly and I had to constantly watch the machine and fix it if it got stuck. Very few of the pipes I made came out with the support material looking as good as in the above photo. However, as long as the part was well supported in two critical places, the print turned out perfect. The first critical place is the overhang where  the wooden top part of the pipe seats into the plastic part. The second is the mouth of the pipe where the air comes out; if this is even a little wonky due to improper support, the pipe will sound excessively breathy.
             
             <br><br>
-            <a href="#" onclick="hide_modal('3d_printed_modal'); show_modal('main_modal')">Go to the whole build tutorial</a>
-            
-            <br><br>
+            <button type="button" onclick="hide_modal('3d_printed_modal'); show_modal('main_modal')">GO TO THE WHOLE BUILD TUTORIAL</button>
+            <br>
             <button type="button" onclick="hide_modal('3d_printed_modal')">CLOSE</button>
           </div>
         </div>
@@ -307,15 +306,15 @@
             <div class="title">Laser-Cut Help</div>
           </div>
           <div class='w3-container bottom-part'>
-            You are suppoed to download the .svg file and then laser-cut it. The finger-jointed parts should be cut out of plywood and will form the main part of the pipe and the tuning slide (with lid if the pipe is closed). The one plain rectangle in the file should be cut out of felt and will line the inside of the tuning slide, keeping it sealed and providing the right amount of friction for tuning. Here is a photo of the cut plywood:
-            <img src="images/laser_1.jpg" alt="Image of laser-cut plywood sitting an Epilog Zing laser-cutter after cutting finished.">
+            You are suppoed to download the .svg file and then laser-cut it. The finger-jointed parts should be cut out of plywood and will form the main part of the pipe and the tuning slide. The tuning slide will have a lid if the pipe is closed. The one plain rectangle in the file should be cut out of felt and will line the inside of the tuning slide, keeping it sealed and providing the right amount of friction for tuning. Here is a photo of the cut plywood:
+            <img src="images/06_laser_in_machine.jpg" alt="Image of laser-cut plywood sitting an Epilog Zing laser-cutter after cutting finished.">
             Here is another photo showing all of the parts, including the felt.
-            <img src="images/laser_2.jpg" alt="Image of another 3d printed part on a white background">
+            <img src="images/07_laser_done.jpg" alt="Image of another 3d printed part on a white background">
             You might need to re-arragne the parts depending on the size of your pipe and laser cutter. The parts in the .svg file are filled and not stroked, so you will probably have to turn off fill and turn on stroke with the line-width required by your printer and software, e.g. 0px or 'hairline'. I used 100% power, 20% speed, and 500Hz on 3.75mm plywood, and 13% power, 100% speed, and 500Hz for 1mm felt.
  
             <br><br>
-            <a href="#" onclick="hide_modal('laser_cut_modal'); show_modal('main_modal')">Go to the whole build tutorial</a>
-            <br><br>
+            <button type="button" onclick="hide_modal('laser_cut_modal'); show_modal('main_modal')">GO TO THE WHOLE BUILD TUTORIAL</button>
+            <br>
             <button type="button" onclick="hide_modal('laser_cut_modal')">CLOSE</button>
           </div>
         </div>
@@ -328,28 +327,92 @@
             <div class="title">What Is This?</div>
           </div>
           <div class='w3-container bottom-part'>
-            This page makes organ pipes. You can enter some information about the pitch and timbre of the pipe you want. It creates files that you can download and use to quickly fabricate real organ pipes! The bottom &apos;mouth&apos; part of the pipe will be in a .stl file that can be 3d-printed, and the top &apos;resonator&apos; part of the pipe will be in a .svg file that can be laser-cut out of plywood and felt. The pipes will always be square (just like most real organ pipes), and will have a tuning slide that fits over the top of the pipe for tuning. For stopped pipes, the tuning slide will be closed, for open pipes it is open. Here is a little tutorial on how to build an organ pipe.
+            <h2>Introduction</h2>
+            This page makes organ pipes. You can enter some information about the pitch and timbre of the pipe you want. It creates files that you can download and use to quickly fabricate real organ pipes! The bottom &apos;mouth&apos; part of the pipe will be in a .stl file that can be 3d-printed, and the top &apos;resonator&apos; part of the pipe will be in a .svg file that can be laser-cut out of plywood and felt. The pipes will always have square cross section, just like most real organ pipes, and will have a tuning slide that fits over the top of the pipe for tuning. For stopped pipes, the tuning slide will have a lid, for open pipes it is open.
+            
+              The pipe design is based loosely on Figures CCLXX and CCLX from the 1905 treatise The Art of Organ Building by George Ashdown Audsley, the former of which is shown here for reference.
+              <img src="images/01_Art_Of_Organ_Building.jpg" class="narrow" alt="Image of another 3d printed part on a white background">
+            
+              Below are instructions on how to build an organ pipe. The pipe depicted throughout the tutorial is MIDI note number 68 (A&#9837;4, 415 Hz), and is closed at the top. It was made using the default value for all of the settings (other than the note number) on this page.
+              
               <hr>
-              Download and 3d-print the mouth part of the pipe. More info is available in the <a href="#" onclick="hide_modal('main_modal'); show_modal('3d_printed_modal')">'3d Print' help</a>.
-              <img src="images/3d_2.jpg" alt="Image of another 3d printed part on a white background">
-              Then download and laser-cut the resonator part of the pipe. More info is available in the <a href="#" onclick="hide_modal('main_modal'); show_modal('laser_cut_modal')">'Laser Cut' help</a>.
+              <h2>3D Printed Mouth</h2>
+              First you need to download the .stl file and 3d-print the mouth part of the pipe. This is what it will look like when you are done printing it.
+              <img src="images/03_3d_print_on_glass.jpg" alt="Image of a 3d printed part on glass with support mateiral still attached">
+              <img src="images/04_3d_print_done.jpg" class="narrow" alt="Image of 3d  printed part with support material removed">
+              More info is available in the 3d Print help.
+              <button type="button" onclick="hide_modal('main_modal'); show_modal('3d_printed_modal')">GO TO 3D PRINT HELP</button>
               
-              <img src="images/laser_2.jpg" alt="Image of another 3d printed part on a white background">
+              <hr>
+              <h2>Laser Cut Resonator and Tuning Slide</h2>
+              Then download and laser-cut the resonator part of the pipe from plywood and felt. This is what the parts will look like when you are done cutting them out.
+              <img src="images/07_laser_done.jpg" alt="Image of laser-cut plywood and felt after being removed from the cutter">
               
-              Use wood-glue to glue the four longest pieces together to form the resonator. After the glue is dry, sand and stain or paint the resonator. This is important, because it helps seal the joints. If the joints are not properly sealed, the pipe might not work well. I used an oil-based wood stain for color, and a water-based polyeurethane to seal everything.
+              More info is available in the Laser Cutter help
+              <button type="button" onclick="hide_modal('main_modal'); show_modal('laser_cut_modal')">GO TO LASER CUTTER HELP</button>
+
+              <hr>
+              <h2>Resonator Assembly</h2>
+              To assemble the resonator part of the pipe, you will need the four longest plywoodwood pieces, glue, and clamps, as shown in the following image:
+              <img src="images/08_start_pipe_body_glueup.jpg" alt="Four pieces, glue, and clamps">
               
-              <img src="images/pipe.jpg" alt="Four pieces assembled as described in the text">
+              Use the wood-glue to glue the four longest pieces together to form the resonator. Use lots of glue, as the resonator needs to be air-tight, and gaps in the glue where air can pass through can prevent the pipe from sounding. Clamp the glued pieces together, as shown in the following image.
+              <img src="images/09_finish_pipe_body_glueup.jpg" class="narrow" alt="Four pieces, glue, and clamps">
               
-              The remaining pieces form the tuning slide. For the best fit, they should be assembled directly onto the resonator. This will involve simultaneously gluing the felt to the inside of the tuning slide using 3M Super 77 Spray Adhesive (or similar), and gluing all of the pieces of the resonator together into a rectangle (with a lid if the pipe is closed) using wood-glue. Clamp the whole assembly firmly to the resonator and allow it to dry, making sure the slide does not accidentally become stuck to the resontor.
+              After the glue is dry, sand and stain or paint the resonator. This is important, because it helps seal the joints, ensuring the pipes are air-tight. I used black latex furniture paint, followed by spray varnish, as depicted in the following image:
+              <img src="images/10_paint_pipe_body.jpg" alt="The painted resonator together with the paint, varnish, and paint brush inplicated in the process">
               
-              <img src="images/slide.jpg" alt="Four pieces assembled as described in the text">
+              <hr>
+              <h2>Tuning Slide</h2>
+              To assemble the  tuning  slide you will need all of the remaining laser-cut pieces including the felt, wood glue, Super 77 spray adhesive, clamps, and the resonator that you finished painting in the last step, as shown in the following image.
+              <img src="images/11_start_tuner_glueup.jpg" class="narrow" alt="Composite image showing the six steps for assembling the tuning slide directly onto the resonator">
               
-              After the tuning slide is fully assembled and the glue has dried, you can stain / paint it without removing it from the pipe.
+              For the best fit, the tuning slide should be assembled directly onto the resonator. This is somewhat tricky, and the process I used is depicted in the following composite image, and the steps are thus:
+              <ol>
+                <li>Put glue on everything. This includes putting wood glue on all of the finger joints of the plywood, and a coating of spray adhesive on one side of the felt.</li>
+                <li>Assemble three of the four sides of the tuning slide, by sticking them together.</li>
+                <li>Set the felt down into the three assembled pieces, spray-adhesive-side down, so that the felt totally lines the inside of the part and the excess sticks up where the fouth side will be.</li>
+                <li>Press the resonator, which you assembled before, down into the felt. Use the resonator to press the felt down into the corners of the tuning slide. The spary adhesive is supposed to hold the felt to the tuning slide, and not to the resonator, as the felt is supposed to slide on the resonator. So be careful not to accidentally glue them together.</li>
+                <li>With the tuning slide still in place, glue the fourth side of the tuning slide in place. The tuning slide now forms a complete ring around the resonator.</li>
+                <li>If the pipe is closed, glue the lid onto the tuning slide.</li>
+              </ol>
+            
+              <img src="images/17_Z_tuner_composite.jpg" alt="Composite image showing the six steps for assembling the tuning slide directly onto the resonator">
+              
+              Firmly clamp the tuning slide.
+              <img src="images/18_tuner_glueup_done.jpg" alt="Composite image showing the six steps for assembling the tuning slide directly onto the resonator">
+              
+              After the tuning slide is fully assembled and the glue has dried, you can sand and stain / paint it without removing it from the pipe. I wrapped the resonator up with paper so I could paint the tuning slide without getting the resonator messy. If the sun is shining, you might as well move your desk outside.
+              <img src="images/19_paint_tuner_glueup.jpg" alt="Composite image showing the six steps for assembling the tuning slide directly onto the resonator">
               
               <br><br>
-              The whole resonator assembly can then be epoxied into the mouth using two-part Gorilla epoxy or similar. It is important that the entire joint be completely air-tight, especially in the front. A finished organ pipe is shown below. It is MIDI number 62 (D above middle C) and is closed at the top.
               
-              <img src="images/finished.jpg" alt="A finished organ pipe">
+              <hr>
+              <h2>Final Assembly</h2>
+              The whole resonator plus tuning slide assembly can then be epoxied into the mouth using two-part Gorilla epoxy or similar.
+              <img src="images/20_start_epoxy.jpg" alt="A finished organ pipe">
+              
+              I mixed up some epoxy and applied it to the inside of the 3d-printed mouth, and then pressed the resonator assembly into place. It is important that the entire joint be completely air-tight, especially in the front, so make sure to use plenty of epoxy there. The finished organ pipe is shown below.
+               <img src="images/21_end_epoxy.jpg" alt="A finished organ pipe">
+               
+               I ended up making 24 of these pipes, ranging from MIDI note number 52 (E3, 164.8 Hz) to MIDI note number 75 (E&#9837;5, 622 Hz), and this entire rank is shown in the following image.
+               <img src="images/22_finished_rank.jpg" alt="A finished organ pipe">
+
+              <hr>
+              <h2>What do they sound like?</h2>
+              Below is a spectrogram of my lowest (E3, 164.8 Hz) pipe. The three most prominent peaks are the 164.8 Hz fundamental; three times the fundamental (494.4Hz) corresponding to a 12th above (B4); and six times the fundamental (989 Hz) corresponding to and octave plus a 12th above (B5). There is an additional small peak at five times the fundamental (824 Hz) correpsonding  to an octave plus a 10th (G#5). There is a sense in which the pipe sounds an entire major triad -- perceptually it sounds like one note, but the spectrogram reveals that the entire triad is present.
+              <img src="images/23_MIDI_52.jpg" alt="Spectrogram of the pipe with MIDI note number 52">
+              The pipe sounds nice and is warm and resonant, although it speaks just slightly slower than it could.
+              <br><br>
+              Here is a spectrogram of my higheest (E&#9837;5, 622 Hz) pipes. There is a peak at each multiple of the fundamemtal, including the octave above, and the next most prominent peaks are again a 12th and an octave above thee 12th.
+              <img src="images/24_MIDI_75.jpg" alt="Spectrogram of the pipe with MIDI note number 75">
+              This pipe is very nice and crisp. It speaks very fast. With my mouth I can triple-tongue and flutter-tounge it, and it responds perfectly. It behaves nicely at almost any pressure and cannot be overblown, and is only underblown with the very weakest pressure. It has a very small amount of chiff, just enough to articulate the begining of the note, and not enough to sound silly.
+              
+              Here is a video where you can hear the entire rank of pipes. They sound pretty good, although some of the pipes (notably the F) were not properly supported during 3d-printing and are excessively noisy as a result of having a slightly deformed mouth. Other than that, they sound nice, like an old baroque organ, and are very gentle and warm.
+              <br><br>
+              <div style="position:relative; width:100%; height:0; padding-bottom:56.25%;">
+              <iframe style="position:absolute; top:0; left:0; width:100%; height:100%; margin:0;" width="560" height="315" id="youtube_player" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              </div>
               
               <br><br>
               <button type="button" onclick="hide_modal('main_modal')">CLOSE</button>
@@ -446,6 +509,12 @@
     
       function show_modal(id)
         {
+          if(id == "main_modal")
+            {
+              var iframe = document.getElementById("youtube_player");
+              iframe.src = "https://www.youtube.com/embed/3dEJR9xg5nU";
+            }
+        
           document.getElementById(id).style.display='block';
           document.body.style.overflow='hidden';
         }
@@ -456,6 +525,8 @@
           m.scrollTop = 0;
           m.style.display='none';
           document.body.style.overflow='auto';
+          var iframe = document.getElementById("youtube_player");
+          iframe.src = "";
         }
 
       function playpause(button)
@@ -474,17 +545,17 @@
     
       function restore_default_params(needs_init)
       {
-        p.midi_number = 60;
-        p.is_closed = false;
-        p.material_thickness = 4;
-        p.felt_thickness = 1;
-        p.air_stem_length = 20;
-        p.stem_diameter = 20;
-        p.tuning_headroom = 0.5;
+        p.midi_number = 72;
+        p.is_closed = true;
+        p.material_thickness = 3.9;
+        p.felt_thickness = 0.7;
+        p.air_stem_length = 21.5;
+        p.stem_diameter = 22.1;
+        p.tuning_headroom = 2.0;
         p.kerf = 0.06;
-        p.normalmensur_deviation = 0;
-        p.ising_number = 2.0;
-        p.air_pressure = 50.8;
+        p.normalmensur_deviation = 4;
+        p.ising_number = 1.88;
+        p.air_pressure = 57.2;
         
         p.nominal_tab_width = 20;
         

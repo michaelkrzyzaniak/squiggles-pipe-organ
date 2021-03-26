@@ -6,8 +6,8 @@ python main.py \
      --data_root=data \
      --sessions_root=lstm_sessions \
      --data_folder=Toy \
-     --session_folder=lstm_test \
+     --session_folder=bach_organ \
      --num_batches=10000 \
-     --save_every=500\
+     --save_every=1000\
      --use_cpu=True
 deactivate

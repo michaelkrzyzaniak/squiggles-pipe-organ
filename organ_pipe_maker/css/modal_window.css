@@ -63,3 +63,8 @@
   display:block;
   margin:3em auto 3em auto;
 }
+
+.bottom-part img.narrow
+{
+  width:60%;
+}

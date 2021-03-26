@@ -5,7 +5,7 @@ source venv/bin/activate
 python main.py \
      --data_root=data \
      --sessions_root=lstm_sessions \
-     --data_folder=Toy \
+     --data_folder=bach_organ \
      --session_folder=lstm_test  \
      --use_cpu=True \
      --sample=True

@@ -248,13 +248,27 @@ class LSTM_Harmonizer(nn.Module) :
         start_secs = start_sample / sr
         end_secs = (start_sample + self.input_size) / sr
         hop_secs = self.hop_size / sr
-        counter = 0
-        
 
         notes = self.get_active_MIDI_notes_in_time_range(midi_file, start_secs, end_secs)
         current_onehot_output, current_output_note = self.output_notes_to_vector(notes)
+
+        counter = 0
+        #scan back to see how long this note has been active
+        scan_back_start_secs = start_secs - hop_secs;
+        scan_back_end_secs   = end_secs - hop_secs;
+        while(scan_back_start_secs >= 0) :
+          notes = self.get_active_MIDI_notes_in_time_range(midi_file, scan_back_start_secs, scan_back_end_secs)
+          scan_back_onehot_output, scan_back_output_note = self.output_notes_to_vector(notes)
+          if(scan_back_output_note != current_output_note):
+            break
+          else:
+            ++counter;
+          scan_back_start_secs -= start_secs - hop_secs;
+          scan_back_end_secs   -= end_secs - hop_secs;
+        
         start_secs += hop_secs
         end_secs   += hop_secs
+
 
         for i in range(self.sequence_length):
             notes = self.get_active_MIDI_notes_in_time_range(midi_file, start_secs, end_secs)
@@ -438,6 +452,7 @@ class LSTM_Harmonizer(nn.Module) :
         self.reverse_synthesize_gold_standard("Bass")
         self.reverse_synthesize_gold_standard("Soprano")
         self.reverse_synthesize_gold_standard("All_But_Alto")
+        self.reverse_synthesize_gold_standard("Alto_Tenor")
         #state = self.get_initial_state(1);
         #input = np.random.rand(self.input_size + self.output_size + 1)
        
