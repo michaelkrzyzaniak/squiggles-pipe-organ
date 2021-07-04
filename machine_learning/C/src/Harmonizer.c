@@ -339,57 +339,6 @@ Matrix* harmonizer_forward(Harmonizer* self, Matrix* inputs)
   return self->layer_3_out;
 }
 
-
-/*-----------------------------------------------------------------------*/
-Matrix* harmonizer_forward_(Harmonizer* self, Matrix* inputs)
-{
-  //linear fully connected layer
-  matrix_multiply_multithread(self->layer_1_weights, inputs, self->layer_1_out);
-  matrix_add(self->layer_1_out, self->layer_1_biases, NULL);
-  matrix_apply_function(self->layer_1_out, harmonizer_relu, self, NULL);
-  
-  //LSTM Layer
-  //https://en.wikipedia.org/wiki/Long_short-term_memory
-  //https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html
-  matrix_multiply_multithread(self->lstm_Wf, self->layer_1_out, self->lstm_temp_w);
-  matrix_multiply_multithread(self->lstm_Uf, self->lstm_h_t, self->lstm_temp_u);
-  matrix_add(self->lstm_temp_w, self->lstm_temp_u, self->lstm_f_t);
-  matrix_add(self->lstm_f_t, self->lstm_bf, NULL);
-  matrix_apply_function(self->lstm_f_t, harmonizer_sigmoid, self, NULL);
-  
-  matrix_multiply_multithread(self->lstm_Wi, self->layer_1_out, self->lstm_temp_w);
-  matrix_multiply_multithread(self->lstm_Ui, self->lstm_h_t, self->lstm_temp_u);
-  matrix_add(self->lstm_temp_w, self->lstm_temp_u, self->lstm_i_t);
-  matrix_add(self->lstm_i_t, self->lstm_bi, NULL);
-  matrix_apply_function(self->lstm_i_t, harmonizer_sigmoid, self, NULL);
-
-  matrix_multiply_multithread(self->lstm_Wo, self->layer_1_out, self->lstm_temp_w);
-  matrix_multiply_multithread(self->lstm_Uo, self->lstm_h_t, self->lstm_temp_u);
-  matrix_add(self->lstm_temp_w, self->lstm_temp_u, self->lstm_o_t);
-  matrix_add(self->lstm_o_t, self->lstm_bo, NULL);
-  matrix_apply_function(self->lstm_o_t, harmonizer_sigmoid, self, NULL);
-
-  matrix_multiply_multithread(self->lstm_Wg, self->layer_1_out, self->lstm_temp_w);
-  matrix_multiply_multithread(self->lstm_Ug, self->lstm_h_t, self->lstm_temp_u);
-  matrix_add(self->lstm_temp_w, self->lstm_temp_u, self->lstm_g_t);
-  matrix_add(self->lstm_g_t, self->lstm_bg, NULL);
-  matrix_apply_function(self->lstm_g_t, harmonizer_tanh, self, NULL);
-  
-  matrix_multiply_pointwise(self->lstm_f_t, self->lstm_c_t, NULL);
-  matrix_multiply_pointwise(self->lstm_i_t, self->lstm_g_t, NULL);
-  matrix_add(self->lstm_f_t, self->lstm_i_t, self->lstm_c_t);
-  
-  matrix_apply_function(self->lstm_c_t, harmonizer_tanh, self, self->lstm_h_t);
-  matrix_multiply_pointwise(self->lstm_h_t, self->lstm_o_t, NULL);
-  
-  //Final linear fully connected layer
-  matrix_multiply_multithread(self->layer_3_weights, self->lstm_h_t, self->layer_3_out);
-  matrix_add(self->layer_3_out, self->layer_3_biases, NULL);
-  
-  return self->layer_3_out;
-}
-
-
 /*-----------------------------------------------------------------------*/
 void harmonizer_process_audio(Harmonizer* self, auSample_t* buffer, int num_frames)
 {

@@ -560,6 +560,8 @@ class LSTM_Harmonizer(nn.Module) :
             
             #input = [[self.calculate_audio_features(input)]]
             #input = [self.calculate_audio_features(input)]
+            
+            start_time = time.time()
             input = self.calculate_audio_features(input)
             
             #autoregressive input
@@ -587,6 +589,9 @@ class LSTM_Harmonizer(nn.Module) :
             output, state = self(input, state)
                         
             output = output[0][0]; #remove superfluous dimensions
+            
+            end_time = time.time()
+            #print(1000000 * (end_time - start_time))
             
             #output = output * 100000;
             #print(output)

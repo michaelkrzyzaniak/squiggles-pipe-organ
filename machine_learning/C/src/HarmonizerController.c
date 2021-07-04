@@ -9,6 +9,7 @@
 
 #include "HarmonizerController.h"
 #include "Harmonizer.h"
+#include "Timestamp.h"
 #include "Beep.h"
 //#include "Timestamp.h"
 
@@ -120,7 +121,14 @@ int harmonizer_controller_audio_callback(void* SELF, auSample_t* buffer, int num
       buffer[frame] = samp;
   }
 
+/*
+  timestamp_microsecs_t start_time = timestamp_get_current_time();
   harmonizer_process_audio(self->harmonizer, buffer, num_frames);
+  timestamp_microsecs_t end_time = timestamp_get_current_time();
+  unsigned diff = (unsigned)(end_time-start_time);
+  if(diff > 100)
+    fprintf(stderr, "%u\r\n", diff);
+*/
 
   return  num_frames;
 }

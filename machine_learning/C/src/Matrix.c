@@ -609,10 +609,10 @@ matrix_ret_t matrix_post_multiply_vector(Matrix* self, Matrix* vector, Matrix* r
   
   matrix_fill_zeros(result);
   
-  for(i=0; i<result_rows; i+=4)
-    for(j=0; j<vector_rows; j+=4)
-      for(x=i; x<min(i+4, result_rows); x++)
-        for(y=j; y<min(j+4, vector_rows); y++)
+  for(i=0; i<result_rows; i+=2)
+    for(j=0; j<vector_rows; j+=2)
+      for(x=i; x<min(i+2, result_rows); x++)
+        for(y=j; y<min(j+2, vector_rows); y++)
           IX(result, x, 0) += IX(self, x, y) * IX(vector, y, 0);
 
   return MATRIX_CONFORMABLE;
