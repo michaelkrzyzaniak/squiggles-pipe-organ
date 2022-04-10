@@ -1,5 +1,5 @@
 mkdir venv
-virtualenv --python=python3.6 venv
+virtualenv --python=python3.9 venv
 source venv/bin/activate
 pip3 install --upgrade pip
 pip3 install -U pip setuptools

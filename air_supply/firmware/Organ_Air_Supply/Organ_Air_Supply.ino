@@ -343,9 +343,9 @@ void loop()
     Serial.print("PRESSURE: \t");
     Serial.print(pressure_sensor_read());
     Serial.println(" inches H2O");
-*/
-    //delay(100);
-    
+
+    delay(100);
+*/  
     float adjustment = pid_update(pressure_sensor_read(), PID_TARGET_PRESSURE);
     high_res_duty += adjustment;
     fan_set_duty(high_res_duty , true);

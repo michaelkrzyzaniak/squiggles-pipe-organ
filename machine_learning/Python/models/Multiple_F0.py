@@ -97,7 +97,7 @@ class Multiple_F0(nn.Module) :
             if abs(spectra[i]) < 0.0002 : #-74 dB
                 spectra[i]= 0+0j
   
-        #square it(dft of autocorrelation)
+        #square it (dft of autocorrelation)
         conjuga = np.conjugate(spectra)
         spectra = np.multiply(spectra, conjuga)
         

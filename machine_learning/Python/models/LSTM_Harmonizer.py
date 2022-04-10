@@ -24,11 +24,11 @@ class LSTM_Harmonizer(nn.Module) :
         self.lowest_midi_note = 36
         self.highest_midi_note = 96
         
-        self.sequence_length = 127
+        self.sequence_length = 256
         
         self.input_size = 2048
         self.hop_size = self.input_size // 2
-        self.hidden_size = 256
+        self.hidden_size = 512
         self.output_size = self.highest_midi_note - self.lowest_midi_note + 1 + 1 #one extra for silence
         self.num_lstm_layers = 1
         
@@ -45,10 +45,12 @@ class LSTM_Harmonizer(nn.Module) :
         #self.lstm_out_activation = torch.nn.LogSoftmax(dim = 1)
         
         #plus 1 for counter
-        self.layer_1      = torch.nn.Linear(self.input_size + self.output_size + 1, self.hidden_size);
+        self.layer_1      = torch.nn.Linear(self.input_size + self.output_size, self.hidden_size);
         self.activation_1 = torch.nn.ReLU()
-        self.layer_2      = torch.nn.Linear(self.lstm_hidden_size, self.output_size);
-        #self.activation_2 = torch.nn.Sigmoid()
+        self.layer_3      = torch.nn.Linear(self.lstm_hidden_size, self.output_size);
+        self.activation_3 = torch.nn.Sigmoid()
+        
+        self.histogram_decay_coeff    = 0.75
         
         #this helps these get saved and restored correctly.
         self.use_cpu                  = use_cpu
@@ -124,7 +126,7 @@ class LSTM_Harmonizer(nn.Module) :
         spectra = np.fft.irfft(spectra, 2*n)
         audio = spectra[:self.input_size]
         
-        #dont normalize audio, tried it, made a lot of crap in the silent sectinos
+        #dont normalize audio, tried it, made a lot of crap in the silent sections
         #normalize audio
         #max = audio[0]
         #if max > 0 :
@@ -132,7 +134,55 @@ class LSTM_Harmonizer(nn.Module) :
         
         return audio
         
+
+    #-------------------------------------------------------------------------------------------
+    def get_active_MIDI_notes_in_time_range_sequence(self, midi_file, seq_start_secs, hop_secs, num_windows):
+        running_time = 0
+        running_notes = []
+        result = []
+        window_start_secs = seq_start_secs;
+        midi_index = 0;
+        midi = []
+        
+        for msg in midi_file :
+            midi.append(msg)
+        
+        for i in range(num_windows) :
+            result.append(running_notes.copy())
+            while running_time < (window_start_secs+hop_secs) :
+              if(midi_index >= len(midi)):
+                break;
+              msg = midi[midi_index]
+              if (running_time + msg.time) > (window_start_secs + hop_secs) :
+                break;
+                
+              midi_index += 1
+              running_time += msg.time
+              
+              if msg.type == 'note_on':
+                  running_notes.append(msg);
+                  
+                  if running_time > window_start_secs :
+                    reattack = False
+                    for m in result[i]:
+                        if (m.note == msg.note) and (m.channel == msg.channel):
+                            reattack = True
+                            break;
+                    if not reattack:
+                        result[i].append(msg)
+              if msg.type == 'note_off':
+                for m in running_notes:
+                    if (m.note == msg.note) and (m.channel == msg.channel):
+                        running_notes.remove(m)
+            
+            window_start_secs += hop_secs;
+        
+        for i in range(len(result)):
+            for j in range(len(result[i])) :
+                result[i][j] = (result[i][j]).note;
     
+        return result;
+        
     #-------------------------------------------------------------------------------------------
     def get_active_MIDI_notes_in_time_range(self, midi, start_secs, end_secs):
         running_time = 0
@@ -190,32 +240,72 @@ class LSTM_Harmonizer(nn.Module) :
         return vector, last_note_index
 
     #-------------------------------------------------------------------------------------------
+    def output_notes_to_vector_sequence(self, notes):
+        vector = [];
+        last_note_index = []
+        
+        #convert non-overlapping to overlapping windows
+        for i in range(len(notes)-1):
+            vector.append(np.zeros(self.output_size))
+            last_note_index.append(0)
+            
+            #rest
+            if len(notes[i]) == 0 :
+                last_note_index[i] = self.output_size-1
+                vector[i][last_note_index[i]] = 1
+
+            for note in notes[i]:
+                while note > self.highest_midi_note:
+                    note -= 12
+                while note < self.lowest_midi_note:
+                    note += 12
+                last_note_index[i] = note-self.lowest_midi_note
+                vector[i][last_note_index[i]] = 1
+
+            for note in notes[i+1]:
+                while note > self.highest_midi_note:
+                    note -= 12
+                while note < self.lowest_midi_note:
+                    note += 12
+                last_note_index[i] = note-self.lowest_midi_note
+                vector[i][last_note_index[i]] = 1
+            
+            #just take the last note, not multiple f0
+            #vector[i][last_note_index[i]] = 1
+
+        return vector, last_note_index
+
+    #-------------------------------------------------------------------------------------------
     def get_random_training_filename_pair(self, is_training=True):
         training_folder = "Training" if is_training else "Validation"
         audio_directory = os.path.join(self.data_directory, training_folder, "Audio")
         midi_directory  = os.path.join(self.data_directory, training_folder, "MIDI")
         
-        #any with at least 2 voices
-        input_voice_mask = random.choice([3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]);
-        #Any with at least one missing voice #input_voice_mask = random.randint(1, 14)
-        #FOR TOY DATA #input_voice_mask = random.choice([1, 8]);
         
-        #get midi file with missing voice
-        #free_voices = [];
-        #for i in range(4):
-        #    if (input_voice_mask & (1 << i)) == 0:
-        #        free_voices.append(i)
-                
-        #output_voice_mask = 1 << (free_voices[random.randint(0, len(free_voices)-1)]);
-        ##output_voice_mask = 8 if (input_voice_mask == 1) else 1
-
-        #get midi file with included voice
+        #input_voice_mask = random.choice([3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]) #any combination with at least 2 voices
+        #input_voice_mask = random.randint(1, 14) #any combination with at least 1 free voice
+        input_voice_mask = random.randint(1, 15) #any combination of voices
+        #input_voice_mask = random.choice([1, 8]); #FOR TOY DATA
+        
+        #find included and missing voices
+        free_voices = [];
         included_voices = [];
         for i in range(4):
-          if(input_voice_mask & (1 << i)) != 0:
+          if (input_voice_mask & (1 << i)) == 0:
+            free_voices.append(i)
+          else:
             included_voices.append(i)
 
-        output_voice_mask = 1 << (random.choice(included_voices));
+        output_voice_mask = 0;
+        #if(len(included_voices) == 1):
+        #output_voice_mask = 1 << (random.choice(free_voices));
+        #else:
+        #output_voice_mask = 1 << (random.choice(included_voices));
+
+        #for toy dataset#output_voice_mask = 8 if (input_voice_mask == 1) else 1
+
+        #for multiple F0
+        output_voice_mask = input_voice_mask
 
         wavs = glob.glob(audio_directory + "/*_{}.wav".format(input_voice_mask));
         wav =  wavs[random.randint(0, len(wavs)-1)];
@@ -242,47 +332,49 @@ class LSTM_Harmonizer(nn.Module) :
             input_vectors.append(wav[s : s+self.input_size])
             input_vectors[i] = self.calculate_audio_features(input_vectors[i])
         
-
         output_vectors = []
         midi_file = MidiFile(midi_filename)
-        start_secs = start_sample / sr
-        end_secs = (start_sample + self.input_size) / sr
         hop_secs = self.hop_size / sr
-
-        notes = self.get_active_MIDI_notes_in_time_range(midi_file, start_secs, end_secs)
-        current_onehot_output, current_output_note = self.output_notes_to_vector(notes)
-
-        counter = 0
-        #scan back to see how long this note has been active
-        scan_back_start_secs = start_secs - hop_secs;
-        scan_back_end_secs   = end_secs - hop_secs;
-        while(scan_back_start_secs >= 0) :
-          notes = self.get_active_MIDI_notes_in_time_range(midi_file, scan_back_start_secs, scan_back_end_secs)
-          scan_back_onehot_output, scan_back_output_note = self.output_notes_to_vector(notes)
-          if(scan_back_output_note != current_output_note):
-            break
-          else:
-            ++counter;
-          scan_back_start_secs -= start_secs - hop_secs;
-          scan_back_end_secs   -= end_secs - hop_secs;
+        seq_start_secs = start_sample / sr
+        #end_seq_secs = seq_start_secs + (hop_secs * (self.sequence_length+2)) #one extra for overlapping windows, one for predictive output
+        end_seq_secs = seq_start_secs + (hop_secs * (self.sequence_length+1)) #one extra for overlapping windows (multi f0 version)
         
-        start_secs += hop_secs
-        end_secs   += hop_secs
+        #num_windows_file_start_to_seq_end = math.ceil(end_seq_secs / hop_secs)
+        #window_of_seq_start = num_windows_file_start_to_seq_end - self.sequence_length - 1; #1 for overalpping window
+        #time_of_first_file_window = end_seq_secs - (hop_secs * num_windows_file_start_to_seq_end) #slightly negative
 
+        notes = self.get_active_MIDI_notes_in_time_range_sequence(midi_file, seq_start_secs-hop_secs, hop_secs, (self.sequence_length+2))
+        #notes = self.get_active_MIDI_notes_in_time_range_sequence(midi_file, time_of_first_file_window, hop_secs, num_windows_file_start_to_seq_end)
+        
+        onehot_outputs, output_indices = self.output_notes_to_vector_sequence(notes)
+
+        i=0;
+        #counter = 1;
+        #histogram = np.zeros(self.output_size);
+        
+        current_onehot_output = onehot_outputs[0]
+        current_output_note = output_indices[0]
 
         for i in range(self.sequence_length):
-            notes = self.get_active_MIDI_notes_in_time_range(midi_file, start_secs, end_secs)
-            next_onehot_output, next_output_note = self.output_notes_to_vector(notes)
-            output_vectors.append(next_output_note)
-            input_vectors[i] = np.concatenate((input_vectors[i], current_onehot_output, [counter]))
-            current_onehot_output = next_onehot_output;
-            counter = counter + 1
-            if(next_output_note != current_output_note) :
-              counter = 0
-            current_output_note = next_output_note
-            start_secs += hop_secs
-            end_secs += hop_secs
-    
+            #histogram *= self.histogram_decay_coeff;
+            #histogram[current_output_note] = 1;
+        
+            next_onehot_output = onehot_outputs[i+1]
+            next_output_note = output_indices[i+1]
+
+            output_vectors.append(next_onehot_output)
+            input_vectors[i] = np.concatenate((input_vectors[i], current_onehot_output))
+            #input_vectors[i-window_of_seq_start] = np.concatenate((input_vectors[i-window_of_seq_start], current_onehot_output, [counter]))
+
+
+            #if(next_output_note != current_output_note) :
+            #  counter = 1;
+            #else :
+            #  counter = counter + 1;
+
+            current_onehot_output = next_onehot_output
+            current_output_note = next_output_note;
+
         return input_vectors, output_vectors
 
     #-------------------------------------------------------------------------------------------
@@ -358,12 +450,12 @@ class LSTM_Harmonizer(nn.Module) :
           output  = output.cuda()
   
         for i in range(len(lstm_out)):
-          output[i] = self.layer_2(lstm_out[i])
+          output[i] = self.activation_3(self.layer_3(lstm_out[i]))
 
         return output, prev_state
 
         
-        #return self.layer_2(self.activation_1(self.layer_1(x))), "ignored"
+        #return self.layer_3(self.activation_1(self.layer_1(x))), "ignored"
 
     #-------------------------------------------------------------------------------------------
     def get_initial_state(self, examples_per_batch) :
@@ -388,16 +480,14 @@ class LSTM_Harmonizer(nn.Module) :
         else:
             self.eval()
         
-        loss_function = nn.CrossEntropyLoss()
-        #loss_function = torch.nn.MSELoss()
-        #loss_function = torch.nn.BCELoss()
-        #loss_function = torch.nn.NLLLoss()
+        #loss_function = nn.CrossEntropyLoss() #for softmax
+        loss_function = torch.nn.BCELoss() #for multiclass
         input, target_output = self.get_random_training_batch(examples_per_batch, is_training)
         #input, target_output = self.get_random_training_sequence(is_training)
         
         input = torch.FloatTensor(input)
-        #target_output = torch.FloatTensor(target_output)
-        target_output = torch.LongTensor(target_output) #For CrossEntropyLoss  Loss
+        target_output = torch.FloatTensor(target_output) #For BCE  Loss
+        #target_output = torch.LongTensor(target_output) #For softmax  Loss
         
         
         if self.use_cpu == False:
@@ -453,6 +543,10 @@ class LSTM_Harmonizer(nn.Module) :
         self.reverse_synthesize_gold_standard("Soprano")
         self.reverse_synthesize_gold_standard("All_But_Alto")
         self.reverse_synthesize_gold_standard("Alto_Tenor")
+        self.reverse_synthesize_gold_standard("Flute")
+        self.reverse_synthesize_gold_standard("Chorale")
+        self.reverse_synthesize_gold_standard("Guitar")
+        self.reverse_synthesize_gold_standard("Josquin")
         #state = self.get_initial_state(1);
         #input = np.random.rand(self.input_size + self.output_size + 1)
        
@@ -511,11 +605,11 @@ class LSTM_Harmonizer(nn.Module) :
         np.save(os.path.join(folder, "bg.npy"), b[2])
         np.save(os.path.join(folder, "bo.npy"), b[3])
 
-        layer_2_weights = self.layer_2.weight.data.numpy()
-        np.save(os.path.join(folder, "layer_3_weights.npy"), layer_2_weights)
+        layer_3_weights = self.layer_3.weight.data.numpy()
+        np.save(os.path.join(folder, "layer_3_weights.npy"), layer_3_weights)
         
-        layer_2_biases = self.layer_2.bias.data.numpy()
-        np.save(os.path.join(folder, "layer_3_biases.npy"), layer_2_biases)
+        layer_3_biases = self.layer_3.bias.data.numpy()
+        np.save(os.path.join(folder, "layer_3_biases.npy"), layer_3_biases)
   
     #-------------------------------------------------------------------------------------------
     def sample_softmax_with_temperature(self, x, temperature) :
@@ -547,6 +641,8 @@ class LSTM_Harmonizer(nn.Module) :
         off_for = 1.0
         on_count = np.zeros(self.output_size)
         
+        histogram = np.zeros(self.output_size);
+        
         self.eval();
         
         state = self.get_initial_state(1)
@@ -565,12 +661,18 @@ class LSTM_Harmonizer(nn.Module) :
             #autoregressive input
             prev_output_vector, active_note = self.output_notes_to_vector(prev_notes)
             
-            counter = counter + 1
-            if(active_note != prev_active_note):
-              counter = 0;
-            prev_active_note = active_note
+            #if(active_note != prev_active_note):
+            #  counter = 1;
+            #else:
+            #  counter = counter + 1
+              
+            #prev_active_note = active_note
             
-            input = [[np.concatenate((input, prev_output_vector, [counter]))]]
+            #histogram *= self.histogram_decay_coeff;
+            #histogram[active_note] = 1;
+            
+            #input = [[np.concatenate((input, histogram, [counter]))]]
+            input = [[np.concatenate((input, prev_output_vector))]]
             
             #input = [np.concatenate((input, output.detach().numpy()))]
             
@@ -593,12 +695,13 @@ class LSTM_Harmonizer(nn.Module) :
 
             #max_output_index = output.argmax().item();
             #not really the max, just a sample with temperature
-            temperature = 0.5
-            max_output_index = self.sample_softmax_with_temperature(output, temperature);
+            #temperature = 0.5
+            #max_output_index = self.sample_softmax_with_temperature(output, temperature);
             
             for i in range(len(output)) :
+                if 0.5 < output[i] :
                 #if np.random.sample() < output[i] :
-                if i == max_output_index :
+                #if i == max_output_index :
                     on_count[i] += 1.0 / on_for
                     if on_count[i] > 1 :
                         on_count[i] = 1

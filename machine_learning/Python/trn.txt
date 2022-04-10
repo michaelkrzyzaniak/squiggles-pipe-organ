@@ -5,9 +5,9 @@ source venv/bin/activate
 python main.py \
      --data_root=data \
      --sessions_root=lstm_sessions \
-     --data_folder=Toy \
-     --session_folder=bach_organ \
-     --num_batches=10000 \
-     --save_every=1000\
+     --data_folder=bach_multiinstrumental \
+     --session_folder=lstm_test \
+     --num_batches=20000 \
+     --save_every=2000\
      --use_cpu=True
 deactivate
