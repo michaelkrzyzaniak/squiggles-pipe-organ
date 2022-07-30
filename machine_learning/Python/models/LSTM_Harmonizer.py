@@ -13,7 +13,7 @@ from mido import MidiFile
 from mido import MidiTrack
 from mido import Message
 import soundfile
-
+from utils.spectral_whitening import *
 
 class LSTM_Harmonizer(nn.Module) :
     #-------------------------------------------------------------------------------------------
@@ -26,9 +26,13 @@ class LSTM_Harmonizer(nn.Module) :
         
         self.sequence_length = 256
         
-        self.input_size = 2048
-        self.hop_size = self.input_size // 2
-        self.hidden_size = 512
+        #self.dft_num_audio_samples = 2048
+        #self.input_size = 572
+        self.dft_num_audio_samples = 4096
+        self.input_size = 1144
+        self.hop_size = self.dft_num_audio_samples // 2
+        self.hidden_size = 256
+
         self.output_size = self.highest_midi_note - self.lowest_midi_note + 1 + 1 #one extra for silence
         self.num_lstm_layers = 1
         
@@ -37,12 +41,9 @@ class LSTM_Harmonizer(nn.Module) :
         
         #supposedly runs faster with batch_first = false
         self.lstm = nn.LSTM(input_size=self.lstm_input_size, hidden_size=self.lstm_hidden_size, num_layers=self.num_lstm_layers, batch_first=False)
-        #self.lstm = torch.nn.RNN(input_size=self.lstm_input_size, hidden_size=self.lstm_hidden_size, num_layers=self.num_lstm_layers);
-        #self.lstm = nn.LSTMCell(input_size=self.lstm_input_size, hidden_size=self.lstm_hidden_size)
-        #self.fc_out = nn.Linear(self.hidden_size, self.output_size)
-        #self.lstm_out_activation = torch.nn.Sigmoid()
-        
-        #self.lstm_out_activation = torch.nn.LogSoftmax(dim = 1)
+
+        #self.middle_layer      = nn.Linear(self.lstm_input_size, self.lstm_hidden_size)
+        #self.middle_activation = torch.nn.ReLU()
         
         #plus 1 for counter
         self.layer_1      = torch.nn.Linear(self.input_size + self.output_size, self.hidden_size);
@@ -60,6 +61,8 @@ class LSTM_Harmonizer(nn.Module) :
         self.__saved_checkpoint_batch = nn.Parameter(torch.IntTensor([0]), requires_grad=False)
         self.__sample_rate            = nn.Parameter(torch.FloatTensor([self.sample_rate]), requires_grad=False)
         self.model_save_prefix        = "model_"
+        
+        whitening_init_band_center_freqs()
         
         # display num params
         self.num_params()
@@ -103,6 +106,7 @@ class LSTM_Harmonizer(nn.Module) :
     #-------------------------------------------------------------------------------------------
     def calculate_audio_features(self, audio):
         n = len(audio)
+        
         #apply hanning window
         audio = np.multiply(audio, np.hanning(n))
         
@@ -112,19 +116,27 @@ class LSTM_Harmonizer(nn.Module) :
         #compute DFT
         spectra = np.fft.rfft(audio)
         
+        #whitening
+        spectra = spectra[0:self.dft_num_audio_samples]
+        spectra = abs(spectra)
+        spectral_whitening(spectra)
+        #spectra = spectra[5:577]
+        spectra = spectra[10:1154]
+        return spectra;
+        
         #cancel noise
         #for i in range(len(spectra)) :
         #    if abs(spectra[i]) < 0.0002 : #-74 dB
         #        spectra[i]= 0+0j
   
         #square it(dft of autocorrelation)
-        conjuga = np.conjugate(spectra)
-        spectra = np.multiply(spectra, conjuga)
+        #conjuga = np.conjugate(spectra)
+        #spectra = np.multiply(spectra, conjuga)
         
         #spectra = np.real(spectra)
         #compute autocorrelation
-        spectra = np.fft.irfft(spectra, 2*n)
-        audio = spectra[:self.input_size]
+        #spectra = np.fft.irfft(spectra, 2*n)
+        #audio = spectra[:self.input_size]
         
         #dont normalize audio, tried it, made a lot of crap in the silent sections
         #normalize audio
@@ -132,7 +144,7 @@ class LSTM_Harmonizer(nn.Module) :
         #if max > 0 :
         #    audio = np.multiply(audio, 1/max)
         
-        return audio
+        #return audio
         
 
     #-------------------------------------------------------------------------------------------
@@ -213,7 +225,7 @@ class LSTM_Harmonizer(nn.Module) :
                     if not reattack:
                         active_notes.append(msg)
     
-            #if not msg.is_meta
+          #if not msg.is_meta
         for m in active_notes:
             result.append(m.note);
     
@@ -280,32 +292,30 @@ class LSTM_Harmonizer(nn.Module) :
         training_folder = "Training" if is_training else "Validation"
         audio_directory = os.path.join(self.data_directory, training_folder, "Audio")
         midi_directory  = os.path.join(self.data_directory, training_folder, "MIDI")
-        
-        
-        #input_voice_mask = random.choice([3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]) #any combination with at least 2 voices
-        #input_voice_mask = random.randint(1, 14) #any combination with at least 1 free voice
-        input_voice_mask = random.randint(1, 15) #any combination of voices
-        #input_voice_mask = random.choice([1, 8]); #FOR TOY DATA
-        
-        #find included and missing voices
-        free_voices = [];
-        included_voices = [];
-        for i in range(4):
-          if (input_voice_mask & (1 << i)) == 0:
-            free_voices.append(i)
-          else:
-            included_voices.append(i)
 
-        output_voice_mask = 0;
-        #if(len(included_voices) == 1):
-        #output_voice_mask = 1 << (random.choice(free_voices));
-        #else:
+        #any with at least 2 voices:
+        #input_voice_mask = random.choice([3, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]);
+        #Any with at least one missing voice:
+        input_voice_mask = random.randint(1, 14)
+        #FOR TOY DATA #input_voice_mask = random.choice([1, 8]);
+        
+        #get midi file with missing voice
+        free_voices = [];
+        for i in range(4):
+            if (input_voice_mask & (1 << i)) == 0:
+                free_voices.append(i)
+                
+        output_voice_mask = 1 << (free_voices[random.randint(0, len(free_voices)-1)]);
+        #output_voice_mask = 8 if (input_voice_mask == 1) else 1
+
+        #get midi file with included voice
+        #included_voices = [];
+        #for i in range(4):
+        #  if(input_voice_mask & (1 << i)) != 0:
+        #    included_voices.append(i)
+
         #output_voice_mask = 1 << (random.choice(included_voices));
 
-        #for toy dataset#output_voice_mask = 8 if (input_voice_mask == 1) else 1
-
-        #for multiple F0
-        output_voice_mask = input_voice_mask
 
         wavs = glob.glob(audio_directory + "/*_{}.wav".format(input_voice_mask));
         wav =  wavs[random.randint(0, len(wavs)-1)];
@@ -319,21 +329,25 @@ class LSTM_Harmonizer(nn.Module) :
     #-------------------------------------------------------------------------------------------
     def get_random_training_sequence_from_file(self, wav_filename, midi_filename):
         wav, sr = librosa.load(wav_filename, sr=self.sample_rate, mono=True)
-        sequence_length_in_samples = (self.sequence_length*self.hop_size-1) + self.input_size
+        sequence_length_in_samples = (self.sequence_length*self.hop_size-1) + self.dft_num_audio_samples
         wav_length_in_samples = len(wav)
         if wav_length_in_samples < (wav_length_in_samples):
             print("{} could not be loaded because it is too short.".format(audio_filename))
             return None, None
         
         input_vectors = [];
-        start_sample = np.random.randint(self.input_size, wav_length_in_samples-sequence_length_in_samples-self.hop_size-1)
+        start_sample = np.random.randint(self.dft_num_audio_samples, wav_length_in_samples-sequence_length_in_samples-self.hop_size-1)
         for i in range(self.sequence_length):
             s = start_sample + (i*self.hop_size)
-            input_vectors.append(wav[s : s+self.input_size])
+            input_vectors.append(wav[s : s+self.dft_num_audio_samples])
             input_vectors[i] = self.calculate_audio_features(input_vectors[i])
         
         output_vectors = []
         midi_file = MidiFile(midi_filename)
+
+        start_secs = start_sample / sr
+        end_secs = (start_sample + self.dft_num_audio_samples) / sr
+
         hop_secs = self.hop_size / sr
         seq_start_secs = start_sample / sr
         #end_seq_secs = seq_start_secs + (hop_secs * (self.sequence_length+2)) #one extra for overlapping windows, one for predictive output
@@ -422,6 +436,17 @@ class LSTM_Harmonizer(nn.Module) :
             return str(h) + ":" + str(m) + ":" + str(s).zfill(2)
         else :
             return str(m) + ":" + str(s).zfill(2)
+
+    #-------------------------------------------------------------------------------------------
+    def forward_ff(self, x, ignored_prev_state) :
+    
+      output = torch.Tensor(len(x), len(x[0]), self.output_size);
+        
+      #[batch][sequence][inputs]
+      for i in range(len(x)):
+        output[i] = self.layer_2(self.middle_activation(self.middle_layer(  self.activation_1(self.layer_1(x[i])))))
+    
+      return output, ignored_prev_state
     
     #-------------------------------------------------------------------------------------------
     #https://pytorch.org/tutorials/beginner/nlp/sequence_models_tutorial.html
@@ -598,15 +623,22 @@ class LSTM_Harmonizer(nn.Module) :
         np.save(os.path.join(folder, "Uf.npy"), U[1])
         np.save(os.path.join(folder, "Ug.npy"), U[2])
         np.save(os.path.join(folder, "Uo.npy"), U[3])
-        
+
         b = np.hsplit(self.lstm.bias_ih_l0.data.numpy() + self.lstm.bias_hh_l0.data.numpy(), 4)
         np.save(os.path.join(folder, "bi.npy"), b[0])
         np.save(os.path.join(folder, "bf.npy"), b[1])
         np.save(os.path.join(folder, "bg.npy"), b[2])
         np.save(os.path.join(folder, "bo.npy"), b[3])
 
-        layer_3_weights = self.layer_3.weight.data.numpy()
-        np.save(os.path.join(folder, "layer_3_weights.npy"), layer_3_weights)
+
+        #middle_layer_weights = self.middle_layer.weight.data.numpy()
+        #np.save(os.path.join(folder, "middle_layer_weights.npy"), middle_layer_weights)
+        
+        #middle_layer_biases = self.middle_layer.bias.data.numpy()
+        #np.save(os.path.join(folder, "middle_layer_biases.npy"), middle_layer_biases)
+
+        layer_2_weights = self.layer_2.weight.data.numpy()
+        np.save(os.path.join(folder, "layer_3_weights.npy"), layer_2_weights)
         
         layer_3_biases = self.layer_3.bias.data.numpy()
         np.save(os.path.join(folder, "layer_3_biases.npy"), layer_3_biases)
@@ -621,11 +653,14 @@ class LSTM_Harmonizer(nn.Module) :
     #-------------------------------------------------------------------------------------------
     def reverse_synthesize_gold_standard(self, filename) :
         gold_standards = glob.glob(os.path.join(self.data_directory, "Validation/Gold_Standard/", filename + ".wav"))
-        
+
         if len(gold_standards) < 1:
             print("Unable to find file {} for reverse synthesis".format(filename))
             return
         gold_standard = gold_standards[0]
+        #TEST
+        #gold_standard = "One_Note_Original_Input.wav"
+        #END TEST
         wav, sr = librosa.load(gold_standard, sr=self.sample_rate, mono=True)
         midi = MidiFile()
         track = MidiTrack()
@@ -650,12 +685,14 @@ class LSTM_Harmonizer(nn.Module) :
         counter = 0;
         prev_active_note = -1;
         
-        while (start_sample + self.input_size) < len(wav):
+        while (start_sample + self.dft_num_audio_samples) < len(wav):
         
-            input = wav[start_sample : start_sample + self.input_size]
+            input = wav[start_sample : start_sample + self.dft_num_audio_samples]
             
             #input = [[self.calculate_audio_features(input)]]
             #input = [self.calculate_audio_features(input)]
+            
+            start_time = time.time()
             input = self.calculate_audio_features(input)
             
             #autoregressive input
@@ -689,6 +726,16 @@ class LSTM_Harmonizer(nn.Module) :
             output, state = self(input, state)
                         
             output = output[0][0]; #remove superfluous dimensions
+            
+            #TEST
+            #for i in range(len(output)):
+              #print(output[i].item())
+        
+            #exit(0)
+            #END TEST
+            
+            end_time = time.time()
+            #print(1000000 * (end_time - start_time))
             
             #output = output * 100000;
             #print(output)
