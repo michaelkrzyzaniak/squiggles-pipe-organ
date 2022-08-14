@@ -1,0 +1,21 @@
+01. Silence
+02. Fan flat on wood, 50 % speed (Stable)
+03. Fan flat on wood, 100 % speed (Stable)
+04. Fan flat on 1mm Felt, 50 % speed (Stable)
+05. Fan flat on 1mm Felt, 100 % speed (Stable)
+06. Fan flat on 3mm Felt, 50 % speed (Stable)
+07. Fan flat on 3mm Felt, 100 % speed (Stable)
+08. Just outlet side of Fan on wood, 50% speed
+09. Just outlet side of Fan in silicone contraption directly on wood, 50% speed
+10. Same as above with 3mm Felt
+11. Same but 100%
+12. Fan held completely off of surface at 50% speed
+13. Fan held completely off of surface at 100% speed
+14. Repeat of 2
+15. Repeat of 3
+16. Repeat of 14 with 6mm Felt
+17. Repeat of 15 with 6mm Felt
+18. fan held in air 50%
+19. Fan held in air 100%
+20. New experiment. Air microphone, fan 100% rockwool+plywood box with front open
+21. Same but closed
